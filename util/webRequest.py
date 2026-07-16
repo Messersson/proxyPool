@@ -8,6 +8,7 @@
 -------------------------------------------------
    Change Activity:
                    2017/7/31:
+                   2026/7/16: 请求失败时返回明确失败状态，避免伪装 200
 -------------------------------------------------
 """
 __author__ = 'J_hao'
@@ -59,6 +60,14 @@ class WebRequest(object):
                 'Connection': 'keep-alive',
                 'Accept-Language': 'zh-CN,zh;q=0.8'}
 
+    @staticmethod
+    def _failed_response():
+        """返回明确失败响应，避免调用方把错误当成功处理"""
+        resp = Response()
+        resp.status_code = 0
+        resp._content = b""
+        return resp
+
     def get(self, url, header=None, retry_time=3, retry_interval=5, timeout=5, *args, **kwargs):
         """
         get method
@@ -80,8 +89,7 @@ class WebRequest(object):
                 self.log.error("requests: %s error: %s" % (url, str(e)))
                 retry_time -= 1
                 if retry_time <= 0:
-                    resp = Response()
-                    resp.status_code = 200
+                    self.response = self._failed_response()
                     return self
                 self.log.info("retry %s second after" % retry_interval)
                 time.sleep(retry_interval)
@@ -107,9 +115,7 @@ class WebRequest(object):
                 self.log.error("requests: %s error: %s" % (url, str(e)))
                 retry_time -= 1
                 if retry_time <= 0:
-                    resp = Response()
-                    resp.status_code = 200
-                    self.response = resp
+                    self.response = self._failed_response()
                     return self
                 self.log.info("retry %s second after" % retry_interval)
                 time.sleep(retry_interval)
@@ -118,7 +124,11 @@ class WebRequest(object):
     def tree(self):
         if not self.response.content:
             return None
-        return etree.HTML(self.response.content)
+        try:
+            return etree.HTML(self.response.content)
+        except Exception as e:
+            self.log.error(str(e))
+            return None
 
     @property
     def text(self):

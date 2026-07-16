@@ -34,7 +34,7 @@ graph LR
 
 ## 扩展校验
 
-在 `helper/validator.py` 中已有自定义校验的示例，自定义函数需返回 `True` 或者 `False`，使用 `ProxyValidator` 中提供的装饰器来区分校验类型。
+在 `helper/validator.py` 中按需新增自定义校验函数，函数需返回 `True` 或者 `False`，使用 `ProxyValidator` 中提供的装饰器来区分校验类型。
 
 ### 示例 1：自定义代理可用性校验
 
@@ -46,7 +46,7 @@ def customValidatorExample01(proxy):
     try:
         r = requests.get("http://www.baidu.com/", headers=HEADER, proxies=proxies, timeout=5)
         return True if r.status_code == 200 and len(r.content) > 200 else False
-    except Exception as e:
+    except Exception:
         return False
 ```
 
@@ -58,11 +58,10 @@ def customValidatorExample02(proxy):
     """自定义代理是否支持 HTTPS 校验函数"""
     proxies = {"https": "https://{proxy}".format(proxy=proxy)}
     try:
-        r = requests.get("https://www.baidu.com/", headers=HEADER, proxies=proxies, timeout=5, verify=False)
-        return True if r.status_code == 200 and len(r.content) > 200 else False
-    except Exception as e:
+        r = requests.head("https://www.qq.com", headers=HEADER, proxies=proxies, timeout=5, verify=False)
+        return True if r.status_code == 200 else False
+    except Exception:
         return False
 ```
 
-!!! note
-    在运行代理可用性校验时，所有被 `ProxyValidator.addHttpValidator` 装饰的函数会依次按定义顺序执行，只有当所有函数都返回 `True` 时才会判断代理可用。`HttpsValidator` 运行机制也是如此。
+建议将校验目标改成与业务一致的站点，可显著提升“池中代理对真实任务可用”的概率。

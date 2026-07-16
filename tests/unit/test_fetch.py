@@ -8,6 +8,7 @@
 -------------------------------------------------
      Change Activity:
                      2026/06/15:
+                     2026/07/16: 线程锁与 name 排除规则
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -15,6 +16,7 @@ __author__ = 'JHao'
 import os
 import sys
 import pytest
+from threading import Lock
 from unittest.mock import patch, MagicMock
 
 import helper.fetch as fetch_mod
@@ -90,8 +92,8 @@ class TestDiscoverFetchers:
         for f in fetchers:
             assert f.enabled is True
 
-    def test_filters_exclude_list(self):
-        """exclude_list 中的被排除"""
+    def test_filters_exclude_list_by_class_name(self):
+        """exclude_list 中的类名被排除"""
         all_fetchers = _discover_fetchers([])
         if not all_fetchers:
             pytest.skip("No fetchers available")
@@ -99,6 +101,16 @@ class TestDiscoverFetchers:
         filtered = _discover_fetchers([first_name])
         filtered_names = [f.__name__ for f in filtered]
         assert first_name not in filtered_names
+
+    def test_filters_exclude_list_by_source_name(self):
+        """exclude_list 中的 name 被排除"""
+        all_fetchers = _discover_fetchers([])
+        if not all_fetchers:
+            pytest.skip("No fetchers available")
+        first_source = all_fetchers[0].name
+        filtered = _discover_fetchers([first_source])
+        filtered_sources = [f.name for f in filtered]
+        assert first_source not in filtered_sources
 
     def test_returns_sorted_by_name(self):
         """返回结果按 name 排序"""
@@ -122,7 +134,7 @@ class TestThreadFetcher:
         mock_cls.return_value.fetch.return_value = ["1.2.3.4:8080", "5.6.7.8:443"]
 
         proxy_dict = {}
-        thread = _ThreadFetcher(mock_cls, proxy_dict)
+        thread = _ThreadFetcher(mock_cls, proxy_dict, Lock())
         thread.run()
 
         assert "1.2.3.4:8080" in proxy_dict
@@ -136,7 +148,7 @@ class TestThreadFetcher:
         mock_cls.return_value.fetch.return_value = ["1.2.3.4:8080", "1.2.3.4:8080"]
 
         proxy_dict = {}
-        thread = _ThreadFetcher(mock_cls, proxy_dict)
+        thread = _ThreadFetcher(mock_cls, proxy_dict, Lock())
         thread.run()
 
         assert "1.2.3.4:8080" in proxy_dict

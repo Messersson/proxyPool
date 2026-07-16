@@ -147,3 +147,31 @@ class TestRedisChangeTable:
         assert redis_client.getCount()["total"] == 0
         redis_client.changeTable("test_proxy")
         assert redis_client.getCount()["total"] == 1
+
+
+class TestRedisHttpsIndex:
+
+    def test_https_index_updated_on_put(self, redis_client):
+        redis_client.put(_make_proxy("1.2.3.4:8080", https=False))
+        redis_client.put(_make_proxy("5.6.7.8:443", https=True))
+        count = redis_client.getCount()
+        assert count["total"] == 2
+        assert count["https"] == 1
+        # get https should only return https proxy
+        result = redis_client.get(https=True)
+        assert result is not None
+        assert json.loads(result)["proxy"] == "5.6.7.8:443"
+
+    def test_delete_clears_https_index(self, redis_client):
+        redis_client.put(_make_proxy("5.6.7.8:443", https=True))
+        redis_client.delete("5.6.7.8:443")
+        assert redis_client.getCount()["https"] == 0
+        assert redis_client.get(https=True) is None
+
+    def test_rebuild_index_from_legacy_data(self, redis_client, fake_redis):
+        # 直接写入主表，模拟旧数据无索引
+        proxy = _make_proxy("9.9.9.9:9999", https=True)
+        fake_redis.hset(redis_client.name, proxy.proxy, proxy.to_json)
+        count = redis_client.getCount()
+        assert count["total"] == 1
+        assert count["https"] == 1

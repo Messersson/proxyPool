@@ -8,6 +8,7 @@
 -------------------------------------------------
    Change Activity:
                    2026/05/28:
+                   2026/07/16: 鉴权与 POST delete 测试
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -127,6 +128,21 @@ class TestDelete:
         assert data["src"] is True
         mocks["delete"].assert_called_once()
 
+    def test_delete_post_json(self, client, mocks):
+        mocks["delete"].return_value = True
+
+        resp = client.post("/delete/", json={"proxy": "1.2.3.4:8080"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["code"] == 0
+        mocks["delete"].assert_called_once()
+
+    def test_delete_missing_proxy(self, client, mocks):
+        resp = client.post("/delete/")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["code"] == 400
+
 
 class TestCount:
 
@@ -154,6 +170,47 @@ class TestCount:
         assert data["count"] == 0
         assert data["http_type"] == {}
         assert data["source"] == {}
+
+
+class TestAuth:
+
+    def test_unauthorized_without_token(self, client, mocks):
+        with patch("api.proxyApi.ConfigHandler") as mock_cls:
+            mock_cls.return_value.apiToken = "secret"
+            resp = client.get("/get/")
+            assert resp.status_code == 401
+            assert resp.get_json()["code"] == 401
+
+    def test_authorized_with_header_token(self, client, mocks):
+        mocks["get"].return_value = Proxy("1.2.3.4:8080", source="test")
+        with patch("api.proxyApi.ConfigHandler") as mock_cls:
+            mock_cls.return_value.apiToken = "secret"
+            resp = client.get("/get/", headers={"X-API-Token": "secret"})
+            assert resp.status_code == 200
+            assert resp.get_json()["proxy"] == "1.2.3.4:8080"
+
+
+class TestHealth:
+
+    def test_health_ok(self, client):
+        from api import proxyApi as api_mod
+        with patch.object(api_mod.proxy_handler, "db") as mock_db:
+            mock_db.getCount.return_value = {"total": 3, "https": 1}
+            resp = client.get("/health/")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["status"] == "ok"
+            assert data["count"] == 3
+            assert data["https"] == 1
+
+    def test_health_error(self, client):
+        from api import proxyApi as api_mod
+        with patch.object(api_mod.proxy_handler, "db") as mock_db:
+            mock_db.getCount.side_effect = RuntimeError("db down")
+            resp = client.get("/health/")
+            assert resp.status_code == 503
+            data = resp.get_json()
+            assert data["status"] == "error"
 
 
 class TestRefresh:

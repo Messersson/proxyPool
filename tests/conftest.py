@@ -26,6 +26,26 @@ from util.singleton import Singleton
 from helper.proxy import Proxy
 
 
+
+@pytest.fixture(autouse=True)
+def isolate_runtime_config(tmp_path_factory, monkeypatch):
+    """避免测试读写真实 data/runtime_config.json"""
+    base = tmp_path_factory.mktemp("runtime_cfg")
+    monkeypatch.setenv("PROXY_POOL_DATA_DIR", str(base))
+    monkeypatch.setenv("PROXY_POOL_CONFIG_FILE", str(base / "runtime_config.json"))
+    try:
+        from handler import configStore
+        configStore.clear_runtime_cache()
+    except Exception:
+        pass
+    yield
+    try:
+        from handler import configStore
+        configStore.clear_runtime_cache()
+    except Exception:
+        pass
+
+
 # --------------- Singleton 重置 ---------------
 
 @pytest.fixture(autouse=True)
@@ -79,6 +99,10 @@ def app():
         mock_db_cls.return_value = mock_db_instance
 
         from api.proxyApi import app as flask_app, proxy_handler
+        from handler.configHandler import ConfigHandler
+        from handler import configStore
+        configStore.clear_runtime_cache()
+        ConfigHandler().reload()
         flask_app.config["TESTING"] = True
 
         # 替换 proxy_handler 的方法为 MagicMock，方便测试中配置返回值

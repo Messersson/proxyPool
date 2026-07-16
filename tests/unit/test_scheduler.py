@@ -8,6 +8,7 @@
 -------------------------------------------------
      Change Activity:
                      2026/06/15:
+                     2026/07/16: 适配可配置调度间隔
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -32,6 +33,15 @@ import helper.scheduler as scheduler_mod
 def _get_attr(name):
     """获取模块中双下划线开头的属性（绕过类内 name mangling）"""
     return getattr(scheduler_mod, name)
+
+
+def _mock_conf():
+    mock_conf = MagicMock()
+    mock_conf.timezone = "Asia/Shanghai"
+    mock_conf.fetchIntervalMinutes = 5
+    mock_conf.checkIntervalMinutes = 2
+    mock_conf.schedulerMaxInstances = 1
+    return mock_conf
 
 
 class TestRunProxyFetch:
@@ -94,9 +104,7 @@ class TestRunScheduler:
     @patch("helper.scheduler.LogHandler")
     def test_adds_two_jobs(self, mock_log, mock_conf_cls, mock_fetch, mock_sched_cls):
         """runScheduler 添加两个定时任务"""
-        mock_conf = MagicMock()
-        mock_conf.timezone = "Asia/Shanghai"
-        mock_conf_cls.return_value = mock_conf
+        mock_conf_cls.return_value = _mock_conf()
         mock_sched = MagicMock()
         mock_sched_cls.return_value = mock_sched
 
@@ -110,9 +118,7 @@ class TestRunScheduler:
     @patch("helper.scheduler.LogHandler")
     def test_fetch_job_interval_5min(self, mock_log, mock_conf_cls, mock_fetch, mock_sched_cls):
         """采集任务间隔 5 分钟"""
-        mock_conf = MagicMock()
-        mock_conf.timezone = "Asia/Shanghai"
-        mock_conf_cls.return_value = mock_conf
+        mock_conf_cls.return_value = _mock_conf()
         mock_sched = MagicMock()
         mock_sched_cls.return_value = mock_sched
 
@@ -129,9 +135,7 @@ class TestRunScheduler:
     @patch("helper.scheduler.LogHandler")
     def test_check_job_interval_2min(self, mock_log, mock_conf_cls, mock_fetch, mock_sched_cls):
         """检查任务间隔 2 分钟"""
-        mock_conf = MagicMock()
-        mock_conf.timezone = "Asia/Shanghai"
-        mock_conf_cls.return_value = mock_conf
+        mock_conf_cls.return_value = _mock_conf()
         mock_sched = MagicMock()
         mock_sched_cls.return_value = mock_sched
 

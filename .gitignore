@@ -11,3 +11,5 @@ docs/specs/
 .coverage
 .pytest_cache/
 htmlcov/
+# runtime config saved from admin UI
+data/runtime_config.json

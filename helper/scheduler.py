@@ -9,6 +9,7 @@
    Change Activity:
                    2019/08/05: proxyScheduler
                    2021/02/23: runProxyCheck时,剩余代理少于POOL_SIZE_MIN时执行抓取
+                   2026/07/16: 可配置间隔，避免任务堆积
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -45,21 +46,25 @@ def __runProxyCheck():
 
 
 def runScheduler():
+    conf = ConfigHandler()
     __runProxyFetch()
 
-    timezone = ConfigHandler().timezone
+    timezone = conf.timezone
     scheduler_log = LogHandler("scheduler")
     scheduler = BlockingScheduler(logger=scheduler_log, timezone=timezone)
 
-    scheduler.add_job(__runProxyFetch, 'interval', minutes=5, id="proxy_fetch", name="proxy采集")
-    scheduler.add_job(__runProxyCheck, 'interval', minutes=2, id="proxy_check", name="proxy检查")
+    scheduler.add_job(__runProxyFetch, 'interval', minutes=conf.fetchIntervalMinutes,
+                      id="proxy_fetch", name="proxy采集")
+    scheduler.add_job(__runProxyCheck, 'interval', minutes=conf.checkIntervalMinutes,
+                      id="proxy_check", name="proxy检查")
     executors = {
         'default': {'type': 'threadpool', 'max_workers': 20},
         'processpool': ProcessPoolExecutor(max_workers=5)
     }
     job_defaults = {
-        'coalesce': False,
-        'max_instances': 10
+        'coalesce': True,
+        'max_instances': conf.schedulerMaxInstances,
+        'misfire_grace_time': 60
     }
 
     scheduler.configure(executors=executors, job_defaults=job_defaults, timezone=timezone)

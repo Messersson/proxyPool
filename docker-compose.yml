@@ -1,14 +1,32 @@
-version: '2'
+version: "3.8"
+
 services:
   proxy_pool:
     build: .
     container_name: proxy_pool
     ports:
       - "5010:5010"
-    links:
-      - proxy_redis
+    depends_on:
+      proxy_redis:
+        condition: service_healthy
     environment:
       DB_CONN: "redis://@proxy_redis:6379/0"
+      # 需要鉴权时取消注释：
+      # API_TOKEN: "change-me"
+    restart: unless-stopped
+
   proxy_redis:
-    image: "redis"
+    image: redis:7-alpine
     container_name: proxy_redis
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - proxy_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  proxy_redis_data:

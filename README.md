@@ -121,11 +121,15 @@ docker-compose up -d
 | api | method | Description | params|
 | ----| ---- | ---- | ----|
 | / | GET | api介绍 | None |
-| /get | GET | 随机获取一个代理| 可选参数: `?type=https` 过滤支持https的代理|
-| /pop | GET | 获取并删除一个代理| 可选参数: `?type=https` 过滤支持https的代理|
-| /all | GET | 获取所有代理 |可选参数: `?type=https` 过滤支持https的代理|
+| /health | GET | 健康检查（默认不鉴权） | None |
+| /admin/config | GET | 配置管理页面 | 可表单保存到 data/runtime_config.json |
+| /get | GET | 随机获取一个代理| 可选参数: `?type=https`；若启用 `API_TOKEN` 需带 token|
+| /pop | GET | 获取并删除一个代理| 可选参数: `?type=https`|
+| /all | GET | 获取所有代理 |可选参数: `?type=https`|
 | /count | GET | 查看代理数量 |None|
-| /delete | GET | 删除代理  |`?proxy=host:ip`|
+| /delete | GET/POST | 删除代理  |GET: `?proxy=host:port`；POST JSON: `{"proxy":"..."}`|
+
+可选鉴权：设置环境变量或 `setting.API_TOKEN` 后，业务接口需请求头 `X-API-Token` / `Authorization: Bearer` 或 `?token=`。
 
 
 * 爬虫使用

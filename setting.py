@@ -8,6 +8,7 @@
 -------------------------------------------------
    Change Activity:
                    2019/2/15:
+                   2026/7/16: 稳定性/调度/鉴权默认配置优化
 -------------------------------------------------
 """
 
@@ -25,12 +26,15 @@ BANNER = r"""
 ****************************************************************
 """
 
-VERSION = "2.4.0"
+VERSION = "2.4.1"
 
 # ############### server config ###############
 HOST = "0.0.0.0"
 
 PORT = 5010
+
+# 可选 API Token。为空表示不鉴权；设置后需请求头 X-API-Token 或 query token=
+API_TOKEN = ""
 
 # ############### database config ###################
 # db connection uri
@@ -45,7 +49,7 @@ TABLE_NAME = 'use_proxy'
 
 # ###### config the proxy fetch function ######
 # 自动扫描 fetcher/sources/ 目录，加载所有 enabled=True 的 fetcher
-# 如需临时禁用某个 fetcher，在下方黑名单中添加类名（不改源文件）
+# 黑名单同时支持 name（如 freevpnnode）和类名（如 FreeVPNNodeFetcher）
 PROXY_FETCHER_EXCLUDE = []
 
 # ############# proxy validator #################
@@ -57,14 +61,18 @@ HTTPS_URL = "https://www.qq.com"
 # 代理验证时超时时间
 VERIFY_TIMEOUT = 10
 
-# 近PROXY_CHECK_COUNT次校验中允许的最大失败次数,超过则剔除代理
-MAX_FAIL_COUNT = 0
+# 近几次校验中允许的最大失败次数,超过则剔除代理
+# 0 = 失败一次即删除；建议 1~2 以降低池子抖动
+MAX_FAIL_COUNT = 1
 
 # 近PROXY_CHECK_COUNT次校验中允许的最大失败率,超过则剔除代理
 # MAX_FAIL_RATE = 0.1
 
 # proxyCheck时代理数量少于POOL_SIZE_MIN触发抓取
 POOL_SIZE_MIN = 20
+
+# 校验并发线程数
+CHECK_THREAD_COUNT = 20
 
 # ############# proxy attributes #################
 # 是否启用代理地域属性
@@ -80,3 +88,10 @@ PROXY_REGION = True
 # Otherwise it will detect the timezone from the system automatically.
 
 TIMEZONE = "Asia/Shanghai"
+
+# 采集/检查任务间隔（分钟）
+FETCH_INTERVAL_MINUTES = 5
+CHECK_INTERVAL_MINUTES = 2
+
+# 同一任务最多并行实例数；建议 1，避免任务堆积
+SCHEDULER_MAX_INSTANCES = 1

@@ -8,6 +8,7 @@
 -------------------------------------------------
      Change Activity:
                      2026/06/15:
+                     2026/07/16: 失败响应 status_code=0
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -66,14 +67,13 @@ class TestWebRequestGet:
     @patch("util.webRequest.time.sleep")
     @patch("util.webRequest.requests.get")
     def test_retry_exhaustion(self, mock_get, mock_sleep):
-        """全部失败 -> 返回 fallback（注意 get() 的 bug: 未赋值 self.response）"""
+        """全部失败 -> 返回明确失败状态 status_code=0"""
         mock_get.side_effect = TimeoutError("timeout")
         wr = WebRequest()
         result = wr.get("http://example.com", retry_time=2, retry_interval=0, timeout=1)
 
         assert result is wr
-        # 注意：get() 在 retry 耗尽时创建了 resp 但未赋值给 self.response
-        # 所以 self.response 仍为初始的空 Response
+        assert wr.response.status_code == 0
         assert mock_get.call_count == 2
 
 
@@ -107,14 +107,13 @@ class TestWebRequestPost:
     @patch("util.webRequest.time.sleep")
     @patch("util.webRequest.requests.post")
     def test_retry_exhaustion(self, mock_post, mock_sleep):
-        """全部失败 -> self.response 被正确赋值（与 get() 不同）"""
+        """全部失败 -> self.response status_code=0"""
         mock_post.side_effect = TimeoutError("timeout")
         wr = WebRequest()
         result = wr.post("http://example.com", retry_time=2, retry_interval=0, timeout=1)
 
         assert result is wr
-        # post() 正确赋值 self.response = resp
-        assert wr.response.status_code == 200
+        assert wr.response.status_code == 0
         assert mock_post.call_count == 2
 
 

@@ -8,6 +8,8 @@
 -------------------------------------------------
    Change Activity:
                    2020/6/22:
+                   2026/7/16: 环境变量布尔/整数解析与鉴权配置
+                   2026/7/16: 支持 runtime_config.json 持久化与热加载
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -15,69 +17,134 @@ __author__ = 'JHao'
 import os
 import setting
 from util.singleton import Singleton
-from util.lazyProperty import LazyProperty
 from util.six import reload_six, withMetaclass
+from handler import configStore
+
+
+def _env_get(key, default=None):
+    return os.environ.get(key, default)
+
+
+def _env_bool(key, default):
+    """
+    解析布尔环境变量。
+    支持 true/false/1/0/yes/no/on/off（大小写不敏感）。
+    未设置时返回 default；非法值回退 default。
+    """
+    raw = os.environ.get(key, None)
+    if raw is None:
+        return bool(default)
+    value = str(raw).strip().lower()
+    if value in ("1", "true", "yes", "y", "on"):
+        return True
+    if value in ("0", "false", "no", "n", "off", ""):
+        return False
+    return bool(default)
+
+
+def _env_int(key, default):
+    raw = os.environ.get(key, None)
+    if raw is None:
+        return int(default)
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return int(default)
 
 
 class ConfigHandler(withMetaclass(Singleton)):
 
     def __init__(self):
-        pass
+        self._cache = {}
+        self.reload()
 
-    @LazyProperty
+    def reload(self):
+        """重新加载 setting + runtime_config（不覆盖环境变量优先级）"""
+        configStore.clear_runtime_cache()
+        # 先从 setting.py 恢复默认，再叠加 runtime 配置，避免进程内污染
+        reload_six(setting)
+        configStore.apply_saved_to_setting_module()
+        self._cache = {}
+
+    def save(self, payload, merge=True):
+        """保存网页提交的配置并立即热加载"""
+        saved = configStore.save_runtime_config(payload, merge=merge)
+        self.reload()
+        return saved
+
+    def _get(self, key):
+        if key not in self._cache:
+            value, _source = configStore.get_effective_value(key)
+            self._cache[key] = value
+        return self._cache[key]
+
+    def get_view(self, mask_secrets=True):
+        return configStore.build_config_view(mask_secrets=mask_secrets)
+
+    @property
     def serverHost(self):
-        return os.environ.get("HOST", setting.HOST)
+        return self._get("HOST")
 
-    @LazyProperty
+    @property
     def serverPort(self):
-        return os.environ.get("PORT", setting.PORT)
+        return self._get("PORT")
 
-    @LazyProperty
+    @property
+    def apiToken(self):
+        return self._get("API_TOKEN") or ""
+
+    @property
     def dbConn(self):
-        return os.getenv("DB_CONN", setting.DB_CONN)
+        return self._get("DB_CONN")
 
-    @LazyProperty
+    @property
     def tableName(self):
-        return os.getenv("TABLE_NAME", setting.TABLE_NAME)
+        return self._get("TABLE_NAME")
 
     @property
     def fetcherExclude(self):
-        reload_six(setting)
-        return getattr(setting, 'PROXY_FETCHER_EXCLUDE', [])
+        return self._get("PROXY_FETCHER_EXCLUDE") or []
 
-    @LazyProperty
+    @property
     def httpUrl(self):
-        return os.getenv("HTTP_URL", setting.HTTP_URL)
+        return self._get("HTTP_URL")
 
-    @LazyProperty
+    @property
     def httpsUrl(self):
-        return os.getenv("HTTPS_URL", setting.HTTPS_URL)
+        return self._get("HTTPS_URL")
 
-    @LazyProperty
+    @property
     def verifyTimeout(self):
-        return int(os.getenv("VERIFY_TIMEOUT", setting.VERIFY_TIMEOUT))
+        return int(self._get("VERIFY_TIMEOUT"))
 
-    # @LazyProperty
-    # def proxyCheckCount(self):
-    #     return int(os.getenv("PROXY_CHECK_COUNT", setting.PROXY_CHECK_COUNT))
-
-    @LazyProperty
+    @property
     def maxFailCount(self):
-        return int(os.getenv("MAX_FAIL_COUNT", setting.MAX_FAIL_COUNT))
+        return int(self._get("MAX_FAIL_COUNT"))
 
-    # @LazyProperty
-    # def maxFailRate(self):
-    #     return int(os.getenv("MAX_FAIL_RATE", setting.MAX_FAIL_RATE))
-
-    @LazyProperty
+    @property
     def poolSizeMin(self):
-        return int(os.getenv("POOL_SIZE_MIN", setting.POOL_SIZE_MIN))
+        return int(self._get("POOL_SIZE_MIN"))
 
-    @LazyProperty
+    @property
+    def checkThreadCount(self):
+        return max(1, int(self._get("CHECK_THREAD_COUNT")))
+
+    @property
     def proxyRegion(self):
-        return bool(os.getenv("PROXY_REGION", setting.PROXY_REGION))
+        return bool(self._get("PROXY_REGION"))
 
-    @LazyProperty
+    @property
     def timezone(self):
-        return os.getenv("TIMEZONE", setting.TIMEZONE)
+        return self._get("TIMEZONE")
 
+    @property
+    def fetchIntervalMinutes(self):
+        return max(1, int(self._get("FETCH_INTERVAL_MINUTES")))
+
+    @property
+    def checkIntervalMinutes(self):
+        return max(1, int(self._get("CHECK_INTERVAL_MINUTES")))
+
+    @property
+    def schedulerMaxInstances(self):
+        return max(1, int(self._get("SCHEDULER_MAX_INSTANCES")))

@@ -9,6 +9,7 @@
    Change Activity:
                    2019/08/06: 多线程采集
                    2026/05/31: 重构为动态加载 fetcher 插件
+                   2026/07/16: 线程安全字典 + 排除规则支持 name/类名
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -16,7 +17,7 @@ __author__ = 'JHao'
 import os
 import sys
 import importlib
-from threading import Thread
+from threading import Thread, Lock
 
 from helper.proxy import Proxy
 from helper.check import DoValidator
@@ -54,15 +55,32 @@ def _load_module(module_name, filepath):
         return None
 
 
+def _normalize_exclude(exclude_list):
+    """排除列表统一为小写字符串集合，同时兼容 name 与类名"""
+    if not exclude_list:
+        return set()
+    return {str(item).strip().lower() for item in exclude_list if str(item).strip()}
+
+
+def _is_excluded(fetcher_cls, exclude_set):
+    if not exclude_set:
+        return False
+    class_name = (fetcher_cls.__name__ or "").lower()
+    source_name = (getattr(fetcher_cls, "name", "") or "").lower()
+    return class_name in exclude_set or source_name in exclude_set
+
+
 def _discover_fetchers(exclude_list):
     """
     自动扫描 sources/ 目录，返回所有 enabled=True 且不在黑名单中的 fetcher 类列表。
+    排除规则同时支持 fetcher.name 与类名。
     仅在文件 mtime 变化时重新加载模块，支持运行时热更新。
     """
     global _module_cache
     sources_dir = _get_sources_dir()
     fetcher_classes = []
     seen_modules = set()
+    exclude_set = _normalize_exclude(exclude_list)
 
     for filename in os.listdir(sources_dir):
         if not filename.endswith('.py') or filename.startswith('_'):
@@ -80,7 +98,7 @@ def _discover_fetchers(exclude_list):
                     and attr is not BaseFetcher
                     and attr.name
                     and attr.enabled
-                    and attr.__name__ not in exclude_list):
+                    and not _is_excluded(attr, exclude_set)):
                 fetcher_classes.append(attr)
 
     # 清理已删除文件的缓存
@@ -93,10 +111,11 @@ def _discover_fetchers(exclude_list):
 
 class _ThreadFetcher(Thread):
 
-    def __init__(self, fetcher_class, proxy_dict):
+    def __init__(self, fetcher_class, proxy_dict, lock):
         Thread.__init__(self)
         self.fetcher_class = fetcher_class
         self.proxy_dict = proxy_dict
+        self.lock = lock
         self.log = LogHandler("fetcher")
 
     def run(self):
@@ -106,11 +125,12 @@ class _ThreadFetcher(Thread):
             for proxy in self.fetcher_class().fetch():
                 self.log.info('ProxyFetch - %s: %s ok' % (fetcher_name, proxy.ljust(23)))
                 proxy = proxy.strip()
-                if proxy in self.proxy_dict:
-                    self.proxy_dict[proxy].add_source(fetcher_name)
-                else:
-                    self.proxy_dict[proxy] = Proxy(
-                        proxy, source=fetcher_name)
+                with self.lock:
+                    if proxy in self.proxy_dict:
+                        self.proxy_dict[proxy].add_source(fetcher_name)
+                    else:
+                        self.proxy_dict[proxy] = Proxy(
+                            proxy, source=fetcher_name)
         except Exception as e:
             self.log.error("ProxyFetch - {func}: error".format(func=fetcher_name))
             self.log.error(str(e))
@@ -129,6 +149,7 @@ class Fetcher(object):
         :return:
         """
         proxy_dict = dict()
+        proxy_lock = Lock()
         thread_list = list()
         self.log.info("ProxyFetch : start")
 
@@ -137,10 +158,10 @@ class Fetcher(object):
         self.log.info("ProxyFetch : active fetchers [%s]" % ", ".join(c.name for c in fetcher_classes))
 
         for fetcher_class in fetcher_classes:
-            thread_list.append(_ThreadFetcher(fetcher_class, proxy_dict))
+            thread_list.append(_ThreadFetcher(fetcher_class, proxy_dict, proxy_lock))
 
         for thread in thread_list:
-            thread.setDaemon(True)
+            thread.daemon = True
             thread.start()
 
         for thread in thread_list:

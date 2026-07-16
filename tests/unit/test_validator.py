@@ -8,16 +8,15 @@
 -------------------------------------------------
    Change Activity:
                    2026/05/28:
+                   2026/07/16: 移除示例校验器测试
 -------------------------------------------------
 """
 __author__ = 'JHao'
 
-import re
 import pytest
 from unittest.mock import patch, MagicMock
 
-# 直接导入 IP_REGEX 和 formatValidator，不导入整个 validator 模块（避免模块级副作用）
-from helper.validator import IP_REGEX, formatValidator, httpTimeOutValidator, httpsTimeOutValidator, customValidatorExample
+from helper.validator import IP_REGEX, formatValidator, httpTimeOutValidator, httpsTimeOutValidator
 
 
 class TestIPRegex:
@@ -114,11 +113,3 @@ class TestHttpsTimeOutValidator:
         """head() raise Timeout -> False"""
         mock_head.side_effect = TimeoutError("connection timed out")
         assert httpsTimeOutValidator("1.2.3.4:8080") is False
-
-
-class TestCustomValidatorExample:
-    """customValidatorExample 测试"""
-
-    def test_always_returns_true(self):
-        """customValidatorExample 始终返回 True"""
-        assert customValidatorExample("1.2.3.4:8080") is True

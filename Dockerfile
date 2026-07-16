@@ -7,12 +7,12 @@ WORKDIR /app
 COPY ./requirements.txt .
 
 # timezone and init process
-RUN apk add -U tzdata tini && \
+RUN apk add -U --no-cache bash tzdata tini && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     apk del tzdata
 
 # runtime environment
-RUN apk add musl-dev gcc libxml2-dev libxslt-dev && \
+RUN apk add --no-cache musl-dev gcc libxml2-dev libxslt-dev && \
     pip install --no-cache-dir -r requirements.txt && \
     apk del gcc musl-dev
 

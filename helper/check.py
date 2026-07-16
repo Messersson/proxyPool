@@ -10,6 +10,7 @@
                    2019/08/06: 执行代理校验
                    2021/05/25: 分别校验http和https
                    2022/08/16: 获取代理Region信息
+                   2026/07/16: 可配置线程数，弃用 setDaemon
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -81,8 +82,8 @@ class DoValidator(object):
         try:
             url = 'https://api.ip.sb/geoip/%s' % proxy.proxy.split(':')[0]
             r = WebRequest().get(url=url, retry_time=1, timeout=2).json
-            return r.get('country_code')
-        except:
+            return r.get('country_code') if r else 'error'
+        except Exception:
             return 'error'
 
 
@@ -147,11 +148,13 @@ def Checker(tp, queue):
     :return:
     """
     thread_list = list()
-    for index in range(20):
+    conf = ConfigHandler()
+    thread_count = conf.checkThreadCount
+    for index in range(thread_count):
         thread_list.append(_ThreadChecker(tp, queue, "thread_%s" % str(index).zfill(2)))
 
     for thread in thread_list:
-        thread.setDaemon(True)
+        thread.daemon = True
         thread.start()
 
     for thread in thread_list:

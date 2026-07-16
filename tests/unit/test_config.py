@@ -8,6 +8,7 @@
 -------------------------------------------------
    Change Activity:
                    2026/05/28:
+                   2026/07/16: 补充布尔解析与调度配置测试
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -23,7 +24,9 @@ def clean_env():
     """测试前后清理可能设置的环境变量"""
     env_keys = ["DB_CONN", "PORT", "HOST", "TABLE_NAME", "HTTP_URL",
                 "HTTPS_URL", "VERIFY_TIMEOUT", "MAX_FAIL_COUNT",
-                "POOL_SIZE_MIN", "PROXY_REGION", "TIMEZONE"]
+                "POOL_SIZE_MIN", "PROXY_REGION", "TIMEZONE", "API_TOKEN",
+                "CHECK_THREAD_COUNT", "FETCH_INTERVAL_MINUTES",
+                "CHECK_INTERVAL_MINUTES", "SCHEDULER_MAX_INSTANCES"]
     saved = {k: os.environ.get(k) for k in env_keys}
     for k in env_keys:
         os.environ.pop(k, None)
@@ -75,6 +78,12 @@ class TestConfigHandlerDefaults:
     def test_fetcher_exclude_is_list(self, conf):
         assert isinstance(conf.fetcherExclude, list)
 
+    def test_proxy_region_default(self, conf):
+        assert conf.proxyRegion is bool(setting.PROXY_REGION)
+
+    def test_api_token_default(self, conf):
+        assert conf.apiToken == getattr(setting, "API_TOKEN", "")
+
 
 class TestConfigHandlerEnvOverride:
 
@@ -97,3 +106,32 @@ class TestConfigHandlerEnvOverride:
         os.environ["MAX_FAIL_COUNT"] = "5"
         conf = ConfigHandler()
         assert conf.maxFailCount == 5
+
+    @pytest.mark.parametrize("raw,expected", [
+        ("false", False),
+        ("0", False),
+        ("no", False),
+        ("off", False),
+        ("true", True),
+        ("1", True),
+        ("yes", True),
+        ("on", True),
+    ])
+    def test_proxy_region_bool_parse(self, raw, expected):
+        os.environ["PROXY_REGION"] = raw
+        conf = ConfigHandler()
+        assert conf.proxyRegion is expected
+
+    def test_api_token_override(self):
+        os.environ["API_TOKEN"] = "secret-token"
+        conf = ConfigHandler()
+        assert conf.apiToken == "secret-token"
+
+    def test_scheduler_intervals_override(self):
+        os.environ["FETCH_INTERVAL_MINUTES"] = "7"
+        os.environ["CHECK_INTERVAL_MINUTES"] = "3"
+        os.environ["SCHEDULER_MAX_INSTANCES"] = "2"
+        conf = ConfigHandler()
+        assert conf.fetchIntervalMinutes == 7
+        assert conf.checkIntervalMinutes == 3
+        assert conf.schedulerMaxInstances == 2

@@ -8,6 +8,7 @@
 -------------------------------------------------
    Change Activity:
                    2023/03/10: 支持带用户认证的代理格式 username:password@ip:port
+                   2026/07/16: 移除永远通过的示例校验器，避免误导
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -64,7 +65,7 @@ def httpTimeOutValidator(proxy):
     try:
         r = head(conf.httpUrl, headers=HEADER, proxies=proxies, timeout=conf.verifyTimeout)
         return True if r.status_code == 200 else False
-    except Exception as e:
+    except Exception:
         return False
 
 
@@ -76,11 +77,5 @@ def httpsTimeOutValidator(proxy):
     try:
         r = head(conf.httpsUrl, headers=HEADER, proxies=proxies, timeout=conf.verifyTimeout, verify=False)
         return True if r.status_code == 200 else False
-    except Exception as e:
+    except Exception:
         return False
-
-
-@ProxyValidator.addHttpValidator
-def customValidatorExample(proxy):
-    """自定义validator函数，校验代理是否可用, 返回True/False"""
-    return True
