@@ -3,276 +3,563 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ProxyPool 配置中心</title>
+  <title>ProxyPool 控制台</title>
   <style>
     :root {
-      --bg: #f4f6f8;
-      --card: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --brand: #0f766e;
-      --brand-2: #115e59;
-      --warn: #b45309;
-      --danger: #b91c1c;
-      --ok: #047857;
-      --chip: #ecfeff;
-      --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      --bg: #f3f5f7; --panel: #ffffff; --text: #1f2937; --muted: #6b7280; --line: #e5e7eb;
+      --brand: #0f766e; --brand-2: #115e59; --brand-soft: #ecfeff; --warn: #b45309;
+      --danger: #b91c1c; --ok: #047857; --shadow: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.05);
+      --sidebar: 228px;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 28%),
-        var(--bg);
-      min-height: 100vh;
-    }
-    .wrap {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 28px 16px 48px;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-      margin-bottom: 18px;
-    }
-    h1 {
-      margin: 0 0 6px;
-      font-size: 28px;
-      letter-spacing: 0;
-    }
-    .sub {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-      padding: 18px;
-      margin-bottom: 14px;
-    }
-    .card h2 {
-      margin: 0 0 14px;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px 16px;
-    }
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-width: 0;
-    }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--text); background: var(--bg); }
+    .app { min-height: 100%; display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); }
+    .sidebar { background: #0b1220; color: #e5e7eb; padding: 18px 14px; border-right: 1px solid #111827; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 14px; }
+    .brand-mark { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(145deg, #14b8a6, #0f766e); display: grid; place-items: center; font-weight: 800; color: #fff; flex: 0 0 auto; }
+    .brand h1 { margin: 0; font-size: 16px; line-height: 1.2; }
+    .brand small { display: block; color: #9ca3af; font-size: 12px; margin-top: 2px; }
+    .nav { display: flex; flex-direction: column; gap: 6px; }
+    .nav button { appearance: none; border: 0; background: transparent; color: #d1d5db; text-align: left; padding: 10px 12px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+    .nav button:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .nav button.active { background: rgba(20,184,166,.16); color: #99f6e4; }
+    .main { min-width: 0; padding: 18px 20px 28px; }
+    .topbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+    .topbar h2 { margin: 0; font-size: 22px; }
+    .topbar .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px; }
+    .card h3 { margin: 0 0 12px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+    .stat { background: #f9fafb; border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+    .stat .k { color: var(--muted); font-size: 12px; }
+    .stat .v { margin-top: 6px; font-size: 24px; font-weight: 700; word-break: break-all; }
+    .stat .hint { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .grid-2 { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px 14px; }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
     .field.full { grid-column: 1 / -1; }
-    label {
-      font-size: 13px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+    label { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .help { color: var(--muted); font-size: 12px; line-height: 1.4; }
+    input[type="text"], input[type="number"], input[type="password"], input[type="search"], textarea, select {
+      width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; font: inherit; color: var(--text); background: #fff; outline: none;
     }
-    .help {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    input[type="text"],
-    input[type="number"],
-    input[type="password"],
-    textarea,
-    select {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px 12px;
-      font: inherit;
-      color: var(--text);
-      background: #fff;
-      outline: none;
-    }
-    input:focus, textarea:focus, select:focus {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
-    }
-    input:disabled, textarea:disabled, select:disabled {
-      background: #f3f4f6;
-      color: #6b7280;
-      cursor: not-allowed;
-    }
+    input:focus, textarea:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,118,110,.12); }
+    input:disabled, textarea:disabled, select:disabled { background: #f3f4f6; color: #6b7280; cursor: not-allowed; }
     textarea { min-height: 72px; resize: vertical; }
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 2px 8px;
-      font-size: 11px;
-      font-weight: 600;
-      background: var(--chip);
-      color: var(--brand-2);
-      border: 1px solid #a5f3fc;
-    }
+    .chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; background: var(--brand-soft); color: var(--brand-2); border: 1px solid #a5f3fc; white-space: nowrap; }
     .chip.env { background: #fff7ed; color: var(--warn); border-color: #fed7aa; }
     .chip.restart { background: #fef2f2; color: var(--danger); border-color: #fecaca; }
     .chip.default { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
-    .actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    button, .btn {
-      border: 0;
-      border-radius: 6px;
-      padding: 10px 14px;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-primary {
-      background: var(--brand);
-      color: #fff;
-    }
+    .chip.ok { background: #ecfdf5; color: var(--ok); border-color: #a7f3d0; }
+    .chip.err { background: #fef2f2; color: var(--danger); border-color: #fecaca; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, .btn { border: 0; border-radius: 6px; padding: 9px 12px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--brand); color: #fff; }
     .btn-primary:hover { background: var(--brand-2); }
-    .btn-secondary {
-      background: #e5e7eb;
-      color: #111827;
-    }
+    .btn-secondary { background: #e5e7eb; color: #111827; }
     .btn-secondary:hover { background: #d1d5db; }
-    .status {
-      min-height: 22px;
-      font-size: 13px;
-      color: var(--muted);
-    }
+    .btn-danger { background: #fee2e2; color: #991b1b; }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-ghost { background: transparent; color: #111827; border: 1px solid var(--line); }
+    .status { min-height: 20px; font-size: 13px; color: var(--muted); }
     .status.ok { color: var(--ok); font-weight: 600; }
     .status.err { color: var(--danger); font-weight: 600; }
-    .token-box {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: end;
-    }
-    .meta {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .meta .item {
-      background: #f9fafb;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px 12px;
-    }
+    .token-box { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; }
+    .meta { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 10px; }
+    .meta .item { background: #f9fafb; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
     .meta .k { color: var(--muted); font-size: 12px; }
     .meta .v { margin-top: 4px; font-size: 13px; word-break: break-all; }
-    .footer-note {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-    @media (max-width: 800px) {
-      .grid, .meta, .token-box { grid-template-columns: 1fr; }
-      header { flex-direction: column; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 700; font-size: 12px; background: #fafafa; position: sticky; top: 0; z-index: 1; }
+    .table-wrap { overflow: auto; max-height: 560px; border: 1px solid var(--line); border-radius: 8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filters { display: grid; grid-template-columns: 1.4fr .7fr .7fr auto; gap: 8px; align-items: end; margin-bottom: 12px; }
+    .bars { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row { display: grid; grid-template-columns: 110px 1fr 48px; gap: 8px; align-items: center; font-size: 12px; }
+    .bar-track { height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; background: #14b8a6; border-radius: 999px; }
+    .list-plain { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .list-plain li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fafafa; }
+    .api-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .api-item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fafafa; }
+    .api-item .path { font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .api-item .desc { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .hidden { display: none !important; }
+    .empty { color: var(--muted); text-align: center; padding: 28px 12px; }
+    .footer-note { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .guide-box { margin: 0 0 14px; padding: 14px 16px; border: 1px solid #cfe8e4; border-radius: 8px; background: #f0fdfa; color: #134e4a; }
+    .guide-box h4 { margin: 0 0 8px; font-size: 14px; color: #0f766e; }
+    .guide-box p { margin: 0 0 8px; font-size: 13px; line-height: 1.55; }
+    .guide-box ul { margin: 0 0 10px; padding-left: 18px; }
+    .guide-box li { margin: 0 0 6px; font-size: 12.5px; line-height: 1.5; }
+    .guide-box code, .guide-box .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: rgba(15,118,110,.08); padding: 1px 5px; border-radius: 4px; }
+    .guide-box .sample { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: #0b1220; color: #e5e7eb; font-size: 12px; line-height: 1.55; overflow: auto; }
+    .guide-box .sample div { margin: 0 0 4px; }
+    .guide-box .tip { margin-top: 8px; color: #0f766e; font-size: 12px; }
+    @media (max-width: 1100px) { .stats, .grid-2, .api-list { grid-template-columns: 1fr 1fr; } .filters { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 860px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid #111827; }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .stats, .grid, .grid-2, .meta, .token-box, .api-list, .filters { grid-template-columns: 1fr; }
     }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <header>
-      <div>
-        <h1>ProxyPool 配置中心</h1>
-        <div class="sub">修改后点「保存配置」会写入本地文件并立即热加载。环境变量覆盖的项会被锁定。</div>
-      </div>
-      <div class="toolbar">
-        <a class="btn btn-secondary" href="/">API 列表</a>
-        <a class="btn btn-secondary" href="/health/">健康检查</a>
-      </div>
-    </header>
-
-    <section class="card">
-      <h2>访问凭证</h2>
-      <div class="token-box">
-        <div class="field">
-          <label for="adminToken">当前请求 Token（可选）</label>
-          <input id="adminToken" type="password" placeholder="若启用了 API_TOKEN，这里填同一个值" autocomplete="off" />
-          <div class="help">会随请求头 X-API-Token 发送；仅保存在浏览器内存，不会写回服务器文件之外。</div>
+<body>  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">P</div>
+        <div>
+          <h1>ProxyPool</h1>
+          <small>统一控制台</small>
         </div>
-        <button type="button" class="btn btn-secondary" id="btnReload">重新加载</button>
       </div>
-      <div class="meta">
-        <div class="item"><div class="k">配置文件</div><div class="v" id="metaFile">-</div></div>
-        <div class="item"><div class="k">文件状态</div><div class="v" id="metaExists">-</div></div>
-        <div class="item"><div class="k">统计</div><div class="v" id="metaStats">-</div></div>
-      </div>
-    </section>
+      <nav class="nav" id="nav">
+        <button type="button" data-view="overview" class="active">总览</button>
+        <button type="button" data-view="proxies">代理池</button>
+        <button type="button" data-view="fetchers">代理源</button>
+        <button type="button" data-view="subs">订阅</button>
+        <button type="button" data-view="config">配置</button>
+        <button type="button" data-view="api">API</button>
+      </nav>
+    </aside>
 
-    <form id="configForm">
-      <div id="groups"></div>
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h2 id="viewTitle">总览</h2>
+          <div class="sub" id="viewSub">服务状态、池容量与来源分布</div>
+        </div>
+        <div class="toolbar">
+          <span class="chip" id="healthChip">检测中</span>
+          <button type="button" class="btn btn-secondary" id="btnRefreshAll">刷新</button>
+        </div>
+      </div>
+
       <section class="card">
-        <div class="actions">
-          <div class="status" id="status">准备就绪</div>
-          <div class="btn-row">
-            <button type="button" class="btn btn-secondary" id="btnReset">恢复当前值</button>
-            <button type="submit" class="btn btn-primary" id="btnSave">保存配置</button>
+        <h3>访问凭证</h3>
+        <div class="token-box">
+          <div class="field">
+            <label for="adminToken">API Token（可选）</label>
+            <input id="adminToken" type="password" placeholder="若启用了 API_TOKEN，在此填写同一值" autocomplete="off" />
+          </div>
+          <button type="button" class="btn btn-secondary" id="btnSaveToken">记住</button>
+          <button type="button" class="btn btn-ghost" id="btnClearToken">清除</button>
+        </div>
+        <div class="help" style="margin-top:8px;">仅保存在浏览器本地，请求时通过 X-API-Token 发送。</div>
+      </section>
+
+      <section class="view" id="view-overview">
+        <div class="stats">
+          <div class="stat"><div class="k">代理总数</div><div class="v" id="statTotal">-</div><div class="hint">池中可用代理</div></div>
+          <div class="stat"><div class="k">HTTP</div><div class="v" id="statHttp">-</div><div class="hint">普通 HTTP 代理</div></div>
+          <div class="stat"><div class="k">HTTPS</div><div class="v" id="statHttps">-</div><div class="hint">支持 HTTPS 的代理</div></div>
+          <div class="stat"><div class="k">代理源</div><div class="v" id="statSources">-</div><div class="hint" id="statSourcesHint">活跃采集源</div></div>
+        </div>
+        <div class="grid-2" style="margin-top:12px;">
+          <div class="card" style="margin:0;">
+            <h3>来源分布</h3>
+            <div class="bars" id="sourceBars"><div class="empty">暂无数据</div></div>
+          </div>
+          <div class="card" style="margin:0;">
+            <h3>快速操作</h3>
+            <div class="btn-row" style="margin-bottom:12px;">
+              <button type="button" class="btn btn-primary" id="btnQuickGet">随机取一个</button>
+              <button type="button" class="btn btn-secondary" id="btnQuickGetHttps">取 HTTPS</button>
+              <button type="button" class="btn btn-secondary" id="btnOpenProxies">管理代理</button>
+            </div>
+            <div class="meta" style="margin-top:0; grid-template-columns:1fr;">
+              <div class="item"><div class="k">最近取得</div><div class="v mono" id="quickProxy">-</div></div>
+              <div class="item"><div class="k">健康检查</div><div class="v" id="quickHealth">-</div></div>
+              <div class="item"><div class="k">配置文件</div><div class="v" id="quickConfigFile">-</div></div>
+            </div>
+            <div class="status" id="overviewStatus" style="margin-top:10px;"></div>
           </div>
         </div>
-        <div class="footer-note">
-          优先级：环境变量 &gt; 网页保存的 runtime 配置 &gt; setting.py 默认值。
-          标记“需重启”的项保存后会写入文件，但调度间隔等要重启 schedule 进程才完全生效。
+      </section>
+
+      <section class="view hidden" id="view-proxies">
+        <div class="card">
+          <div class="filters">
+            <div class="field">
+              <label for="proxySearch">搜索</label>
+              <input id="proxySearch" type="search" placeholder="IP / 端口 / 来源 / 地区" />
+            </div>
+            <div class="field">
+              <label for="proxyType">类型</label>
+              <select id="proxyType">
+                <option value="all">全部</option>
+                <option value="http">HTTP</option>
+                <option value="https">HTTPS</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="proxySort">排序</label>
+              <select id="proxySort">
+                <option value="latency_asc">延迟从低到高</option>
+                <option value="last_time_desc">最近检测</option>
+                <option value="fail_asc">失败次数升序</option>
+                <option value="check_desc">检测次数降序</option>
+                <option value="proxy_asc">地址</option>
+              </select>
+            </div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-secondary" id="btnReloadProxies">刷新列表</button>
+            </div>
+          </div>
+          <div class="actions" style="margin-bottom:10px;">
+            <div class="status" id="proxyStatus">准备就绪</div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-primary" id="btnTestAllProxies">一键全部测试</button>
+              <button type="button" class="btn btn-secondary" id="btnGetOne">随机获取</button>
+              <button type="button" class="btn btn-secondary" id="btnPopOne">获取并弹出</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>代理</th><th>类型</th><th>来源</th><th>地区</th><th>失败</th><th>检测</th><th>延迟</th><th>最近状态</th><th>最近时间</th><th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="proxyTableBody">
+                <tr><td colspan="10" class="empty">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
-    </form>
-  </div>
 
-  <script>
-    const groupsEl = document.getElementById("groups");
-    const formEl = document.getElementById("configForm");
-    const statusEl = document.getElementById("status");
-    const tokenEl = document.getElementById("adminToken");
+      <section class="view hidden" id="view-fetchers">
+        <div class="grid-2">
+          <div class="card" style="margin:0;">
+            <h3>启用中的代理源</h3>
+            <div class="status" id="fetcherStatus" style="margin-bottom:10px;"></div>
+            <ul class="list-plain" id="fetcherList"><li class="empty">加载中...</li></ul>
+          </div>
+          <div class="card" style="margin:0;">
+            <h3>排除名单</h3>
+            <div class="help" style="margin-bottom:10px;">可在“配置”页修改 PROXY_FETCHER_EXCLUDE，支持 name 或类名，逗号分隔。</div>
+            <ul class="list-plain" id="excludeList"><li class="empty">无</li></ul>
+          </div>
+        </div>
+      </section>
+
+
+      <section class="view hidden" id="view-subs">
+        <div class="card">
+          <h3>导入 FlClash / Clash 订阅</h3>
+          <div class="help" style="margin-bottom:10px;">
+            支持 FlClash 订阅链接、Clash YAML、base64 分享链、ss/vmess/trojan/vless 等协议节点、纯文本 ip:port。
+            协议节点会写入节点库；其中 HTTP/HTTPS 节点会同时进入代理池供 /get 使用。
+          </div>
+          <div class="grid">
+            <div class="field full">
+              <label for="subUrl">订阅链接</label>
+              <input id="subUrl" type="text" placeholder="https://xxx/s/xxxxx  (FlClash 订阅链接)" />
+            </div>
+            <div class="field">
+              <label for="subName">名称（可选）</label>
+              <input id="subName" type="text" placeholder="我的订阅" />
+            </div>
+            <div class="field">
+              <label for="subSave">保存到订阅列表</label>
+              <select id="subSave">
+                <option value="true" selected>是</option>
+                <option value="false">否（仅本次导入）</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label for="subContent">或粘贴订阅内容</label>
+              <textarea id="subContent" placeholder="可粘贴 Clash YAML / base64 / 文本代理列表"></textarea>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:12px;">
+            <div class="status" id="subStatus">准备就绪</div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-secondary" id="btnReloadSubs">刷新列表</button>
+              <button type="button" class="btn btn-primary" id="btnImportSub">立即导入</button>
+            </div>
+          </div>
+          <div class="meta" style="margin-top:12px;">
+            <div class="item"><div class="k">识别格式</div><div class="v" id="subFmt">-</div></div>
+            <div class="item"><div class="k">HTTP 节点</div><div class="v" id="subHttp">-</div></div>
+            <div class="item"><div class="k">入库结果</div><div class="v" id="subPool">-</div></div>
+          </div>
+          <div class="help" id="subWarn" style="margin-top:8px;"></div>
+        </div>
+        <div class="card">
+          <h3>自定义对外接口（独立规则）</h3>
+          <div class="guide-box" id="endpointGuide">
+            <h4>怎么填、怎么调（跨设备访问）</h4>
+            <p><b>完整调用地址 = 协议 + 服务器IP/域名 + 端口 + /open/slug</b>。这里的 slug 只是路径名；真正给其他设备调用时，要把本机/服务器的 IP 和端口写进去。</p>
+            <div class="meta" style="margin:10px 0 12px; grid-template-columns:1fr 1fr;">
+              <div class="item"><div class="k">当前页面访问根地址</div><div class="v mono" id="endpointBaseUrl">-</div></div>
+              <div class="item"><div class="k">示例完整接口</div><div class="v mono" id="endpointSampleUrl">-</div></div>
+            </div>
+            <ul>
+              <li><b>服务监听</b>：在“配置”页看 <code>HOST</code>/<code>PORT</code>。部署到服务器时通常：
+                <code>HOST=0.0.0.0</code>（监听所有网卡，允许外机访问），
+                <code>PORT=5010</code>（或你自己选的端口，如 8080/9000）。</li>
+              <li><b>其他设备怎么调</b>：
+                局域网用 <code>http://192.168.x.x:5010/open/crawler-a</code>；
+                公网/服务器用 <code>http://你的公网IP或域名:端口/open/crawler-a</code>。
+                不要写 127.0.0.1 给别的机器，那只代表“对方自己”。</li>
+              <li><b>防火墙/安全组</b>：服务器上要放行这个端口（Windows 防火墙 / 云厂商安全组）。否则本机能开，外机连不上。</li>
+              <li><b>接口标识 slug</b>：路径后缀，只能字母数字 <code>_-</code>，例如 <code>crawler-a</code>。保存后路径是 <code>/open/crawler-a</code>。</li>
+              <li><b>名称</b>：仅后台显示，不影响调用。</li>
+              <li><b>策略</b>：
+                <code>round_robin</code>=轮流取；
+                <code>lowest_latency</code>=永远最低延迟；
+                <code>random</code>=随机；
+                <code>sticky</code>=同一客户端尽量粘住同一代理（配合租约）。</li>
+              <li><b>代理池</b>：
+                <code>auto</code>=优先 HTTP 池，没有再取协议节点；
+                <code>http</code>=只取 HTTP/HTTPS 代理；
+                <code>node</code>=只取协议节点（anytls/vmess/ss 等）。</li>
+              <li><b>租约秒数</b>：同一 <code>client_id</code> 在该时间内复用同一代理。默认 300。</li>
+              <li><b>优先低延迟 / 跳过超时 / 最大延迟</b>：过滤与优选；最大延迟填 <code>0</code> 表示不限制。</li>
+              <li><b>节点类型</b>：仅 node 池生效，如 <code>anytls</code>；留空不限。</li>
+              <li><b>指定HTTP代理</b>：一般留空。填了就固定返回它，不再自动选。</li>
+              <li><b>接口Token</b>：这个接口自己的密钥。外网建议一定设置。调用时放请求头 <code>X-API-Token</code>，或 query <code>token=</code>。</li>
+            </ul>
+            <div class="sample" id="endpointSampleBox">
+              <div># 本机自测（仅当前电脑）</div>
+              <div id="sampleLocal">GET http://127.0.0.1:5010/open/crawler-a?client_id=job-1</div>
+              <div></div>
+              <div># 其他设备 / 服务器部署后（把 IP 和端口换成实际值）</div>
+              <div id="sampleRemote">GET http://服务器IP:5010/open/crawler-a?client_id=job-1</div>
+              <div></div>
+              <div># 带 Token（推荐外网）</div>
+              <div id="sampleToken">curl -H "X-API-Token: 你的token" "http://服务器IP:5010/open/crawler-a?client_id=job-1"</div>
+              <div></div>
+              <div># 强制换下一个代理</div>
+              <div>GET /open/crawler-a?client_id=job-1&amp;rotate=1</div>
+              <div></div>
+              <div># 返回重点：item.proxy / item.proxy_url / lease_remain_seconds</div>
+            </div>
+            <div class="tip">推荐流程：配置页确认 HOST=0.0.0.0、PORT=你要开放的端口 → 这里建 slug → 防火墙放行端口 → 其他设备访问 http://服务器IP:端口/open/slug 。每个业务建一个 slug，规则互不影响。</div>
+          </div>
+                    <div class="grid" style="margin-bottom:12px;">
+            <div class="field full">
+              <label for="endpointPublicBase">对外访问根地址（可选）</label>
+              <input id="endpointPublicBase" type="text" placeholder="例如 http://192.168.0.153:5010 或 http://你的公网IP:5010" />
+              <div class="help">给其他设备调用时用这个。留空则自动用当前浏览器地址（window.location.origin）。部署到服务器后建议填服务器 IP/域名。</div>
+            </div>
+          </div>
+          <div class="card" id="endpointCallBox" style="margin:0 0 12px; background:#f8fafc;">
+            <h3 style="margin-bottom:8px;">完整调用地址（自动生成）</h3>
+            <div class="meta" style="margin-top:0; grid-template-columns:1fr;">
+              <div class="item">
+                <div class="k">当前配置生成的完整接口</div>
+                <div class="v mono" id="endpointFullCallUrl" style="word-break:break-all;">填写 slug 后自动显示</div>
+              </div>
+              <div class="item">
+                <div class="k">带请求头方式（推荐）</div>
+                <div class="v mono" id="endpointFullCallCurl" style="word-break:break-all;">-</div>
+              </div>
+            </div>
+            <div class="btn-row" style="margin-top:10px;">
+              <button type="button" class="btn btn-primary" id="btnCopyFullCallUrl">复制完整调用地址</button>
+              <button type="button" class="btn btn-secondary" id="btnCopyFullCallCurl">复制 curl</button>
+            </div>
+            <div class="help" style="margin-top:8px;">格式：http://服务器IP:端口/open/slug?token=密钥&amp;client_id=job-1。token 会优先用本接口 Token；没有则不带 token 参数。</div>
+          </div>
+<div class="grid">
+            <div class="field"><label for="endpointSlug">接口标识 slug <span class="chip default">必填</span></label><input id="endpointSlug" type="text" placeholder="crawler-a" /><div class="help">只是路径后缀；完整地址还要加 服务器IP:端口</div></div>
+            <div class="field"><label for="endpointName">名称</label><input id="endpointName" type="text" placeholder="爬虫A" /><div class="help">仅后台显示，随便起</div></div>
+            <div class="field"><label for="endpointStrategy">策略</label>
+              <select id="endpointStrategy"><option value="round_robin">轮询 round_robin</option><option value="lowest_latency">最低延迟 lowest_latency</option><option value="random">随机 random</option><option value="sticky">粘性 sticky</option></select>
+              <div class="help">决定怎么选下一个代理</div>
+            </div>
+            <div class="field"><label for="endpointPool">代理池</label>
+              <select id="endpointPool"><option value="auto">auto</option><option value="http">http</option><option value="node">node</option></select>
+              <div class="help">auto=HTTP优先，没有再取节点</div>
+            </div>
+            <div class="field"><label for="endpointLease">租约秒数</label><input id="endpointLease" type="number" value="300" /><div class="help">同 client_id 在租约内复用同一代理</div></div>
+            <div class="field"><label for="endpointPreferLowLatency">优先低延迟</label>
+              <select id="endpointPreferLowLatency"><option value="true" selected>是（推荐）</option><option value="false">否</option></select>
+              <div class="help">从低延迟候选里取</div>
+            </div>
+            <div class="field"><label for="endpointSkipTimeout">跳过超时节点</label>
+              <select id="endpointSkipTimeout"><option value="true" selected>是</option><option value="false">否</option></select>
+              <div class="help">过滤最近测试失败的节点</div>
+            </div>
+            <div class="field"><label for="endpointMaxLatency">最大延迟ms(0不限)</label><input id="endpointMaxLatency" type="number" value="0" /><div class="help">例如 500 只取 &lt;=500ms</div></div>
+            <div class="field"><label for="endpointNodeType">节点类型(可选)</label><input id="endpointNodeType" type="text" placeholder="anytls / vmess / ss" /><div class="help">仅 node 池生效，留空不限</div></div>
+            <div class="field full"><label for="endpointFixedProxy">指定HTTP代理(可选)</label><input id="endpointFixedProxy" type="text" placeholder="1.2.3.4:8080" /><div class="help">填了就固定返回它，不再自动选。普通场景请留空</div></div>
+            <div class="field full"><label for="endpointToken">接口Token(可选)</label><input id="endpointToken" type="password" placeholder="不填则走全局 API_TOKEN" /><div class="help">调用时放请求头 X-API-Token，或 query token=</div></div>
+          </div>
+          <div class="actions" style="margin-top:12px;">
+            <div class="status" id="endpointStatus">填完点“保存接口”，下方列表会出现 /open/xxx 路径</div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-secondary" id="btnReloadEndpoints">刷新接口</button>
+              <button type="button" class="btn btn-primary" id="btnSaveEndpoint">保存接口</button>
+            </div>
+          </div>
+          <div class="table-wrap" style="margin-top:12px;">
+            <table>
+              <thead><tr><th>名称</th><th>完整调用地址</th><th>策略</th><th>池</th><th>租约(秒)</th><th>低延迟优先</th><th>操作</th></tr></thead>
+              <tbody id="endpointTableBody"><tr><td colspan="6" class="empty">加载中...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>已保存订阅</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>链接</th>
+                  <th>启用</th>
+                  <th>最近同步</th>
+                  <th>统计</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="subTableBody">
+                <tr><td colspan="6" class="empty">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="view hidden" id="view-config">
+        <div class="card">
+          <div class="meta" style="margin-top:0;">
+            <div class="item"><div class="k">配置文件</div><div class="v" id="metaFile">-</div></div>
+            <div class="item"><div class="k">文件状态</div><div class="v" id="metaExists">-</div></div>
+            <div class="item"><div class="k">字段统计</div><div class="v" id="metaStats">-</div></div>
+          </div>
+        </div>
+        <form id="configForm">
+          <div id="groups"></div>
+          <section class="card">
+            <div class="actions">
+              <div class="status" id="configStatus">准备就绪</div>
+              <div class="btn-row">
+                <button type="button" class="btn btn-secondary" id="btnResetConfig">恢复当前值</button>
+                <button type="submit" class="btn btn-primary" id="btnSaveConfig">保存配置</button>
+              </div>
+            </div>
+            <div class="footer-note">
+              优先级：环境变量 &gt; 网页保存的 runtime 配置 &gt; setting.py 默认值。
+              标记“需重启”的项保存后会写入文件，但调度间隔等需重启 schedule 进程才完全生效。
+            </div>
+          </section>
+        </form>
+      </section>
+
+      <section class="view hidden" id="view-api">
+        <div class="card">
+          <h3>接口一览</h3>
+          <div class="api-list" id="apiList"></div>
+        </div>
+      </section>
+    </main>
+  </div>  <script>
+    const TOKEN_KEY = "proxypool.admin.token";
+    const views = {
+      overview: { title: "总览", sub: "服务状态、池容量与来源分布" },
+      proxies: { title: "代理池", sub: "查看、筛选、获取与删除代理" },
+      fetchers: { title: "代理源", sub: "当前启用的采集源与排除名单" },
+      subs: { title: "订阅", sub: "导入 FlClash / Clash 订阅；协议节点进节点池，HTTP 节点进代理池" },
+      config: { title: "配置", sub: "运行时参数热加载与持久化" },
+      api: { title: "API", sub: "业务接口速查" },
+    };
+    const els = {
+      nav: document.getElementById("nav"),
+      viewTitle: document.getElementById("viewTitle"),
+      viewSub: document.getElementById("viewSub"),
+      healthChip: document.getElementById("healthChip"),
+      adminToken: document.getElementById("adminToken"),
+      overviewStatus: document.getElementById("overviewStatus"),
+      proxyStatus: document.getElementById("proxyStatus"),
+      configStatus: document.getElementById("configStatus"),
+      fetcherStatus: document.getElementById("fetcherStatus"),
+      proxyTableBody: document.getElementById("proxyTableBody"),
+      groups: document.getElementById("groups"),
+      sourceBars: document.getElementById("sourceBars"),
+      fetcherList: document.getElementById("fetcherList"),
+      excludeList: document.getElementById("excludeList"),
+      apiList: document.getElementById("apiList"),
+      subStatus: document.getElementById("subStatus"),
+      subTableBody: document.getElementById("subTableBody"),
+    };
+    let currentView = "overview";
     let currentFields = [];
+    let allProxies = [];
 
-    function headers() {
-      const h = { "Content-Type": "application/json" };
-      const token = tokenEl.value.trim();
+    function headers(json = true) {
+      const h = {};
+      if (json) h["Content-Type"] = "application/json";
+      const token = els.adminToken.value.trim();
       if (token) h["X-API-Token"] = token;
       return h;
     }
+    function setStatus(el, text, type) {
+      el.textContent = text || "";
+      el.className = "status" + (type ? " " + type : "");
+    }
+    function escapeHtml(s) {
+      return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    }
+    function escapeAttr(s) { return escapeHtml(s).replaceAll("'", "&#39;"); }
 
-    function setStatus(text, type) {
-      statusEl.textContent = text || "";
-      statusEl.className = "status" + (type ? " " + type : "");
+    async function api(path, options = {}) {
+      const resp = await fetch(path, options);
+      let data = null;
+      const text = await resp.text();
+      try { data = text ? JSON.parse(text) : null; } catch (_) { data = text; }
+      if (!resp.ok) {
+        let msg = (data && data.src) || ("请求失败: " + resp.status);
+        if (resp.status === 404) msg = "接口不存在(404)。请重启 python proxyPool.py server 加载最新代码";
+        if (resp.status === 502) msg = "订阅下载失败: " + ((data && data.src) || resp.status);
+        if (resp.status === 422) msg = "订阅已下载但未解析到节点: " + ((data && data.src) || "");
+        const err = new Error(msg);
+        err.status = resp.status;
+        err.data = data;
+        throw err;
+      }
+      return data;
     }
 
+    function showView(name) {
+      currentView = name;
+      Object.keys(views).forEach((key) => {
+        document.getElementById("view-" + key).classList.toggle("hidden", key !== name);
+      });
+      els.nav.querySelectorAll("button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.view === name);
+      });
+      els.viewTitle.textContent = views[name].title;
+      els.viewSub.textContent = views[name].sub;
+      if (name === "proxies") loadProxies().catch(showErr);
+      if (name === "fetchers") loadFetchers().catch(showErr);
+      if (name === "subs") { loadSubscriptions().catch(showErr); loadEndpoints().catch(showErr); }
+      if (name === "config") loadConfig().catch(showErr);
+      if (name === "overview") loadOverview().catch(showErr);
+      if (name === "api") renderApiList();
+    }
+    function showErr(err) {
+      const msg = err && err.message ? err.message : String(err);
+      if (currentView === "proxies") setStatus(els.proxyStatus, msg, "err");
+      else if (currentView === "config") setStatus(els.configStatus, msg, "err");
+      else if (currentView === "fetchers") setStatus(els.fetcherStatus, msg, "err");
+      else if (currentView === "subs") setStatus(els.subStatus, msg, "err");
+      else setStatus(els.overviewStatus, msg, "err");
+    }
     function sourceChip(source) {
       if (source === "env") return '<span class="chip env">环境变量</span>';
       if (source === "runtime") return '<span class="chip">已保存</span>';
       return '<span class="chip default">默认</span>';
     }
-
     function groupBy(fields) {
       const map = new Map();
       fields.forEach((f) => {
@@ -280,19 +567,17 @@
         map.get(f.group).push(f);
       });
       return map;
-    }
-
-    function renderFields(fields) {
+    }    function renderFields(fields) {
       currentFields = fields;
-      groupsEl.innerHTML = "";
+      els.groups.innerHTML = "";
       const grouped = groupBy(fields);
       grouped.forEach((list, groupName) => {
         const section = document.createElement("section");
         section.className = "card";
-        section.innerHTML = `<h2>${groupName}</h2><div class="grid"></div>`;
+        section.innerHTML = `<h3>${escapeHtml(groupName)}</h3><div class="grid"></div>`;
         const grid = section.querySelector(".grid");
         list.forEach((f) => {
-          const full = f.type === "list" || f.key === "DB_CONN" || f.key === "HTTP_URL" || f.key === "HTTPS_URL";
+          const full = f.type === "list" || ["DB_CONN", "HTTP_URL", "HTTPS_URL"].includes(f.key);
           const wrap = document.createElement("div");
           wrap.className = "field" + (full ? " full" : "");
           const chips = [
@@ -302,8 +587,7 @@
           ].join(" ");
           let control = "";
           if (f.type === "bool") {
-            control = `
-              <select id="f_${f.key}" name="${f.key}" ${f.locked ? "disabled" : ""}>
+            control = `<select id="f_${f.key}" name="${f.key}" ${f.locked ? "disabled" : ""}>
                 <option value="true" ${f.value === true || f.value === "true" ? "selected" : ""}>开启</option>
                 <option value="false" ${f.value === false || f.value === "false" ? "selected" : ""}>关闭</option>
               </select>`;
@@ -316,43 +600,12 @@
           } else {
             control = `<input id="f_${f.key}" name="${f.key}" type="text" value="${escapeAttr(f.value || "")}" ${f.locked ? "disabled" : ""} />`;
           }
-          wrap.innerHTML = `
-            <label for="f_${f.key}">${escapeHtml(f.label)} ${chips}</label>
-            ${control}
-            <div class="help">${escapeHtml(f.help || "")}</div>
-          `;
+          wrap.innerHTML = `<label for="f_${f.key}">${escapeHtml(f.label)} ${chips}</label>${control}<div class="help">${escapeHtml(f.help || "")}</div>`;
           grid.appendChild(wrap);
         });
-        groupsEl.appendChild(section);
+        els.groups.appendChild(section);
       });
     }
-
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;");
-    }
-    function escapeAttr(s) {
-      return escapeHtml(s).replaceAll("'", "&#39;");
-    }
-
-    async function loadConfig() {
-      setStatus("加载中...");
-      const resp = await fetch("/admin/config/api", { headers: headers() });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        setStatus(data.src || ("加载失败: " + resp.status), "err");
-        return;
-      }
-      document.getElementById("metaFile").textContent = data.file || "-";
-      document.getElementById("metaExists").textContent = data.exists ? "已有保存文件" : "尚未保存过（使用默认值）";
-      document.getElementById("metaStats").textContent = "字段 " + (data.fields || []).length + " 项";
-      renderFields(data.fields || []);
-      setStatus("已加载当前生效配置", "ok");
-    }
-
     function collectPayload() {
       const payload = {};
       currentFields.forEach((f) => {
@@ -362,42 +615,635 @@
         let val = el.value;
         if (f.type === "bool") val = val === "true";
         if (f.type === "int") val = Number(val);
-        if (f.type === "password" && (val === "********" || val === "")) {
-          // 保留原值：不提交密码掩码
-          return;
-        }
+        if (f.type === "password" && (val === "********" || val === "")) return;
         payload[f.key] = val;
       });
       return payload;
     }
-
-    formEl.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const payload = collectPayload();
-      setStatus("保存中...");
-      const resp = await fetch("/admin/config/api", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        setStatus(data.src || ("保存失败: " + resp.status), "err");
+    function renderSourceBars(sourceMap) {
+      const entries = Object.entries(sourceMap || {}).sort((a, b) => b[1] - a[1]);
+      if (!entries.length) {
+        els.sourceBars.innerHTML = '<div class="empty">暂无数据</div>';
         return;
       }
-      const restart = (data.restart_required || []).join(", ");
-      setStatus(
-        restart
-          ? "已保存并热加载。以下项建议重启进程: " + restart
-          : "已保存并热加载生效",
-        "ok"
-      );
-      await loadConfig();
+      const max = Math.max(...entries.map((x) => x[1]), 1);
+      els.sourceBars.innerHTML = entries.map(([name, count]) => {
+        const pct = Math.max(4, Math.round((count / max) * 100));
+        return `<div class="bar-row"><div class="mono" title="${escapeAttr(name)}">${escapeHtml(name)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><div>${count}</div></div>`;
+      }).join("");
+    }
+    function renderProxyTable() {
+      const q = document.getElementById("proxySearch").value.trim().toLowerCase();
+      const type = document.getElementById("proxyType").value;
+      const sort = document.getElementById("proxySort").value;
+      let rows = allProxies.slice();
+      if (type === "http") rows = rows.filter((p) => !p.https);
+      if (type === "https") rows = rows.filter((p) => !!p.https);
+      if (q) {
+        rows = rows.filter((p) => {
+          const blob = [p.proxy, p.source, p.region, p.anonymous].join(" ").toLowerCase();
+          return blob.includes(q);
+        });
+      }
+      rows.sort((a, b) => {
+        if (sort === "latency_asc") {
+          const la = (a.latency_ms === 0 || a.latency_ms > 0) ? Number(a.latency_ms) : (a.latency_ms === -1 || a.latency_ms === "-1" ? 1e12 : 1e11);
+          const lb = (b.latency_ms === 0 || b.latency_ms > 0) ? Number(b.latency_ms) : (b.latency_ms === -1 || b.latency_ms === "-1" ? 1e12 : 1e11);
+          return la - lb;
+        }
+        if (sort === "fail_asc") return (a.fail_count || 0) - (b.fail_count || 0);
+        if (sort === "check_desc") return (b.check_count || 0) - (a.check_count || 0);
+        if (sort === "proxy_asc") return String(a.proxy).localeCompare(String(b.proxy));
+        return String(b.last_time || "").localeCompare(String(a.last_time || ""));
+      });
+      if (!rows.length) {
+        els.proxyTableBody.innerHTML = '<tr><td colspan="10" class="empty">没有匹配的代理</td></tr>';
+        setStatus(els.proxyStatus, `共 ${allProxies.length} 条，筛选后 0 条`);
+        return;
+      }
+      els.proxyTableBody.innerHTML = rows.map((p) => {
+        const ok = p.last_status === true || p.last_status === "True" || p.last_status === "true";
+        const bad = p.last_status === false || p.last_status === "False" || p.last_status === "false";
+        const statusChip = ok ? '<span class="chip ok">可用</span>' : bad ? '<span class="chip err">失败</span>' : `<span class="chip default">${escapeHtml(p.last_status || "-")}</span>`;
+        return `<tr>
+            <td><div class="mono">${escapeHtml(p.name || p.proxy || "")}</div><div class="help mono">${escapeHtml(p.proxy || "")}${p.server ? (" · " + escapeHtml(p.server) + ":" + escapeHtml(p.port || "")) : ""}</div></td>
+            <td>${p.protocol && p.protocol !== "http" && p.protocol !== "https" ? (`<span class="chip">${escapeHtml(p.protocol)}</span>`) : (p.https ? '<span class="chip">HTTPS</span>' : '<span class="chip default">HTTP</span>')}</td>
+            <td>${escapeHtml(p.source || "-")}</td>
+            <td>${escapeHtml(p.region || "-")}</td>
+            <td>${escapeHtml(p.fail_count ?? 0)}</td>
+            <td>${escapeHtml(p.check_count ?? 0)}</td>
+            <td class="mono">${(p.latency_ms === -1 || p.latency_ms === '-1') ? '<span class="chip err">超时</span>' : ((p.latency_ms === 0 || p.latency_ms > 0) ? (escapeHtml(p.latency_ms) + ' ms') : '<span class="chip default">未测</span>')}</td>
+            <td>${statusChip}</td>
+            <td class="mono">${escapeHtml(p.last_time || "-")}</td>
+            <td><div class="row-actions">
+              <button type="button" class="btn btn-ghost" data-test="${escapeAttr(p.proxy || "")}">测试</button>
+              <button type="button" class="btn btn-ghost" data-copy="${escapeAttr(p.proxy || "")}">复制</button>
+              <button type="button" class="btn btn-danger" data-del="${escapeAttr(p.proxy || "")}">删除</button>
+            </div></td>
+          </tr>`;
+      }).join("");
+      setStatus(els.proxyStatus, `共 ${allProxies.length} 条，当前显示 ${rows.length} 条`, "ok");
+    }    async function loadHealth() {
+      try {
+        const data = await api("/health/");
+        els.healthChip.className = "chip ok";
+        els.healthChip.textContent = "健康 · " + (data.count ?? 0);
+        document.getElementById("quickHealth").textContent = `status=${data.status}, count=${data.count ?? 0}, https=${data.https ?? 0}`;
+        return data;
+      } catch (err) {
+        els.healthChip.className = "chip err";
+        els.healthChip.textContent = "异常";
+        document.getElementById("quickHealth").textContent = err.message;
+        throw err;
+      }
+    }
+    async function loadOverview() {
+      setStatus(els.overviewStatus, "加载中...");
+      const [health, count, fetchers, config] = await Promise.all([
+        loadHealth().catch((e) => ({ error: e.message })),
+        api("/count/"),
+        api("/admin/fetchers/").catch(() => ({ count: 0, active: [] })),
+        api("/admin/config/api").catch(() => null),
+      ]);
+      document.getElementById("statTotal").textContent = count.count ?? 0;
+      document.getElementById("statHttp").textContent = (count.http_type && count.http_type.http) || 0;
+      document.getElementById("statHttps").textContent = (count.http_type && count.http_type.https) || 0;
+      document.getElementById("statSources").textContent = fetchers.count ?? Object.keys(count.source || {}).length;
+      document.getElementById("statSourcesHint").textContent = `活跃源 ${fetchers.count ?? 0}，已入库来源 ${Object.keys(count.source || {}).length}`;
+      renderSourceBars(count.source || {});
+      if (config) document.getElementById("quickConfigFile").textContent = config.file || "-";
+      setStatus(els.overviewStatus, health && health.error ? ("健康检查失败: " + health.error) : "总览已更新", health && health.error ? "err" : "ok");
+    }
+    async function loadProxies() {
+      setStatus(els.proxyStatus, "加载中...");
+      allProxies = await api("/all/");
+      if (!Array.isArray(allProxies)) allProxies = [];
+      renderProxyTable();
+    }
+    async function loadFetchers() {
+      setStatus(els.fetcherStatus, "加载中...");
+      const data = await api("/admin/fetchers/");
+      const active = data.active || [];
+      const exclude = data.exclude || [];
+      els.fetcherList.innerHTML = active.length
+        ? active.map((f) => `<li><span>${escapeHtml(f.name)}</span><span class="mono">${escapeHtml(f.class)}</span></li>`).join("")
+        : '<li class="empty">没有启用中的代理源</li>';
+      els.excludeList.innerHTML = exclude.length
+        ? exclude.map((x) => `<li><span class="mono">${escapeHtml(x)}</span><span class="chip env">排除</span></li>`).join("")
+        : '<li class="empty">无排除项</li>';
+      setStatus(els.fetcherStatus, `启用 ${active.length} 个代理源`, "ok");
+    }
+    async function loadConfig() {
+      setStatus(els.configStatus, "加载中...");
+      const data = await api("/admin/config/api");
+      document.getElementById("metaFile").textContent = data.file || "-";
+      document.getElementById("metaExists").textContent = data.exists ? "已有保存文件" : "尚未保存过（使用默认值）";
+      document.getElementById("metaStats").textContent = "字段 " + (data.fields || []).length + " 项";
+      document.getElementById("quickConfigFile").textContent = data.file || "-";
+      renderFields(data.fields || []);
+      setStatus(els.configStatus, "已加载当前生效配置", "ok");
+    }
+    function renderApiList() {
+      const items = [
+        { path: "/get", desc: "随机获取一个代理，可选 ?type=https" },
+        { path: "/pop", desc: "获取并删除一个代理" },
+        { path: "/all", desc: "返回全部代理列表" },
+        { path: "/count", desc: "返回数量、类型与来源统计" },
+        { path: "/delete", desc: "删除指定代理，支持 GET/POST" },
+        { path: "/admin/proxy/test", desc: "手动测试单个代理/节点并更新延迟" },
+        { path: "/admin/proxy/test_all", desc: "一键测试全部代理/节点并更新延迟" },
+        { path: "/health", desc: "健康检查，默认不鉴权" },
+        { path: "/admin/fetchers", desc: "列出启用中的代理源" },
+        { path: "/admin/subscriptions", desc: "管理 FlClash/Clash 订阅" },
+        { path: "/admin/subscriptions/import", desc: "立即导入 FlClash 订阅链接或内容" },
+        { path: "/admin/nodes", desc: "查看已导入节点库" },
+        { path: "/node/get", desc: "随机获取协议节点 vmess/ss/trojan" },
+        { path: "/node/pop", desc: "获取并删除协议节点" },
+        { path: "/node/all", desc: "列出协议节点池" },
+        { path: "/node/count", desc: "协议节点数量统计" },
+        { path: "/node/delete", desc: "删除协议节点" },
+        { path: "/v1/proxy", desc: "统一获取代理（轮询/租约/指定）" },
+        { path: "/v1/proxy/rules", desc: "查看/设置调度规则" },
+        { path: "/v1/proxy/status", desc: "调度状态与租约" },
+        { path: "/admin/endpoints", desc: "自定义对外接口（独立规则）" },
+        { path: "/open/<slug>", desc: "自定义接口调用入口" },
+        { path: "/admin/config/api", desc: "读取/保存运行时配置" },
+        { path: "/api", desc: "JSON 接口目录" },
+        { path: "/", desc: "统一控制台（本页）" },
+      ];
+      els.apiList.innerHTML = items.map((item) => `<div class="api-item"><div class="path">${escapeHtml(item.path)}</div><div class="desc">${escapeHtml(item.desc)}</div></div>`).join("");
+    }
+    async function getProxy(https = false, pop = false) {
+      const path = (pop ? "/pop/" : "/get/") + (https ? "?type=https" : "");
+      const data = await api(path);
+      if (!data || !data.proxy) throw new Error((data && data.src) || "no proxy");
+      document.getElementById("quickProxy").textContent = data.proxy + (data.https ? " (https)" : "");
+      return data;
+    }
+    async function deleteProxy(proxy) {
+      return api("/delete/", { method: "POST", headers: headers(true), body: JSON.stringify({ proxy }) });
+    }
+    let testingAll = false;
+    async function testOneProxy(proxy) {
+      if (!proxy) throw new Error("missing proxy");
+      const data = await api("/admin/proxy/test/", {
+        method: "POST",
+        headers: headers(true),
+        body: JSON.stringify({ proxy }),
+      });
+      const item = (data && data.proxy) || {};
+      const idx = allProxies.findIndex((x) => x.proxy === proxy);
+      if (data && data.action === "deleted") {
+        if (idx >= 0) allProxies.splice(idx, 1);
+      } else if (item && item.proxy) {
+        if (idx >= 0) allProxies[idx] = Object.assign({}, allProxies[idx], item);
+        else allProxies.unshift(item);
+      }
+      renderProxyTable();
+      return data;
+    }
+    async function testAllProxies() {
+      if (testingAll) return;
+      testingAll = true;
+      const btn = document.getElementById("btnTestAllProxies");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "测试中...";
+      }
+      setStatus(els.proxyStatus, "正在一键测试全部节点，请稍候...");
+      try {
+        const data = await api("/admin/proxy/test_all/", {
+          method: "POST",
+          headers: headers(true),
+          body: JSON.stringify({}),
+        });
+        await loadProxies();
+        const ok = data.ok ?? 0;
+        const fail = data.fail ?? 0;
+        const deleted = data.deleted ?? 0;
+        const total = data.total ?? (ok + fail);
+        setStatus(
+          els.proxyStatus,
+          `全部测试完成：共 ${total}，可用 ${ok}，超时/失败 ${fail}，删除 ${deleted}`,
+          fail && !ok ? "err" : "ok"
+        );
+        return data;
+      } finally {
+        testingAll = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "一键全部测试";
+        }
+      }
+    }
+
+    els.nav.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-view]");
+      if (!btn) return;
+      showView(btn.dataset.view);
+    });
+    document.getElementById("btnRefreshAll").addEventListener("click", () => {
+      if (currentView === "proxies") loadProxies().catch(showErr);
+      else if (currentView === "config") loadConfig().catch(showErr);
+      else if (currentView === "fetchers") loadFetchers().catch(showErr);
+      else if (currentView === "subs") loadSubscriptions().catch(showErr);
+      else loadOverview().catch(showErr);
+    });
+    document.getElementById("btnSaveToken").addEventListener("click", () => {
+      localStorage.setItem(TOKEN_KEY, els.adminToken.value.trim());
+      setStatus(els.overviewStatus, "Token 已保存在浏览器本地", "ok");
+    });
+    document.getElementById("btnClearToken").addEventListener("click", () => {
+      els.adminToken.value = "";
+      localStorage.removeItem(TOKEN_KEY);
+      setStatus(els.overviewStatus, "Token 已清除", "ok");
+    });
+    document.getElementById("btnQuickGet").addEventListener("click", async () => {
+      try { const p = await getProxy(false, false); setStatus(els.overviewStatus, "已获取 " + p.proxy, "ok"); }
+      catch (err) { showErr(err); }
+    });
+    document.getElementById("btnQuickGetHttps").addEventListener("click", async () => {
+      try { const p = await getProxy(true, false); setStatus(els.overviewStatus, "已获取 " + p.proxy, "ok"); }
+      catch (err) { showErr(err); }
+    });
+    document.getElementById("btnOpenProxies").addEventListener("click", () => showView("proxies"));
+    document.getElementById("btnReloadProxies").addEventListener("click", () => loadProxies().catch(showErr));
+    document.getElementById("btnTestAllProxies").addEventListener("click", () => testAllProxies().catch(showErr));
+    document.getElementById("proxySearch").addEventListener("input", renderProxyTable);
+    document.getElementById("proxyType").addEventListener("change", renderProxyTable);
+    document.getElementById("proxySort").addEventListener("change", renderProxyTable);
+    document.getElementById("btnGetOne").addEventListener("click", async () => {
+      try { const p = await getProxy(false, false); setStatus(els.proxyStatus, "已获取 " + p.proxy, "ok"); }
+      catch (err) { showErr(err); }
+    });
+    document.getElementById("btnPopOne").addEventListener("click", async () => {
+      try { const p = await getProxy(false, true); setStatus(els.proxyStatus, "已弹出 " + p.proxy, "ok"); await loadProxies(); }
+      catch (err) { showErr(err); }
+    });
+    els.proxyTableBody.addEventListener("click", async (e) => {
+      const copyBtn = e.target.closest("[data-copy]");
+      const delBtn = e.target.closest("[data-del]");
+      const testBtn = e.target.closest("[data-test]");
+      if (testBtn) {
+        const val = testBtn.getAttribute("data-test");
+        const oldText = testBtn.textContent;
+        testBtn.disabled = true;
+        testBtn.textContent = "测试中";
+        try {
+          const data = await testOneProxy(val);
+          const item = (data && data.proxy) || {};
+          const latency = item.latency_ms;
+          if (data && data.action === "deleted") {
+            setStatus(els.proxyStatus, "测试失败并已删除 " + val, "err");
+          } else if (data && data.src === "ok") {
+            setStatus(els.proxyStatus, "测试通过 " + val + " · " + ((latency === 0 || latency > 0) ? (latency + " ms") : "可用"), "ok");
+          } else {
+            setStatus(els.proxyStatus, "测试超时/失败 " + val, "err");
+          }
+        } catch (err) {
+          showErr(err);
+        } finally {
+          testBtn.disabled = false;
+          testBtn.textContent = oldText || "测试";
+        }
+        return;
+      }
+      if (copyBtn) {
+        const val = copyBtn.getAttribute("data-copy");
+        try { await navigator.clipboard.writeText(val); setStatus(els.proxyStatus, "已复制 " + val, "ok"); }
+        catch (_) { setStatus(els.proxyStatus, "复制失败，请手动选择", "err"); }
+      }
+      if (delBtn) {
+        const val = delBtn.getAttribute("data-del");
+        if (!confirm("确认删除代理 " + val + " ?")) return;
+        try { await deleteProxy(val); setStatus(els.proxyStatus, "已删除 " + val, "ok"); await loadProxies(); }
+        catch (err) { showErr(err); }
+      }
+    });
+    document.getElementById("configForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = collectPayload();
+      setStatus(els.configStatus, "保存中...");
+      try {
+        const data = await api("/admin/config/api", { method: "POST", headers: headers(true), body: JSON.stringify(payload) });
+        const restart = (data.restart_required || []).join(", ");
+        setStatus(els.configStatus, restart ? ("已保存并热加载。建议重启: " + restart) : "已保存并热加载生效", "ok");
+        await loadConfig();
+      } catch (err) { showErr(err); }
+    });
+    document.getElementById("btnResetConfig").addEventListener("click", () => loadConfig().catch(showErr));
+
+    async function loadSubscriptions() {
+      setStatus(els.subStatus, "加载中...");
+      const data = await api("/admin/subscriptions/");
+      const items = data.items || [];
+      if (!items.length) {
+        els.subTableBody.innerHTML = '<tr><td colspan="6" class="empty">还没有保存订阅，先在上方导入链接</td></tr>';
+        setStatus(els.subStatus, "暂无保存订阅", "ok");
+        return;
+      }
+      els.subTableBody.innerHTML = items.map((it) => {
+        const stats = it.last_sync_stats || {};
+        const pool = it.last_sync_pool || {};
+        const statText = `节点${stats.total_nodes ?? "-"} / HTTP${stats.http_nodes ?? "-"} / 跳过${stats.skipped_nodes ?? "-"}`;
+        const poolText = pool.total != null ? `入库${pool.total}` : "-";
+        return `<tr>
+          <td>${escapeHtml(it.name || it.id || "-")}</td>
+          <td class="mono" style="max-width:280px;word-break:break-all;">${escapeHtml(it.url || "")}</td>
+          <td>${it.enabled === false ? '<span class="chip err">停用</span>' : '<span class="chip ok">启用</span>'}</td>
+          <td class="mono">${escapeHtml(it.last_sync_at || "-")}<div class="help">${escapeHtml(it.last_error || "")}</div></td>
+          <td>${escapeHtml(statText)}<div class="help">${escapeHtml(poolText)}</div></td>
+          <td><div class="row-actions">
+            <button type="button" class="btn btn-secondary" data-sub-sync="${escapeAttr(it.id || "")}">同步</button>
+            <button type="button" class="btn btn-ghost" data-sub-toggle="${escapeAttr(it.id || "")}" data-enabled="${it.enabled === false ? "0" : "1"}">${it.enabled === false ? "启用" : "停用"}</button>
+            <button type="button" class="btn btn-danger" data-sub-del="${escapeAttr(it.id || "")}">删除</button>
+          </div></td>
+        </tr>`;
+      }).join("");
+      setStatus(els.subStatus, `已保存 ${items.length} 条订阅`, "ok");
+    }
+
+    function fillSubResult(result) {
+      const stats = (result && result.stats) || {};
+      const pool = (result && result.pool) || {};
+      document.getElementById("subFmt").textContent = (result && result.format) || "-";
+      document.getElementById("subHttp").textContent = String(stats.total_nodes ?? 0) + " (HTTP " + String(stats.http_nodes ?? 0) + " / 协议 " + String(stats.protocol_nodes ?? 0) + ")";
+      document.getElementById("subPool").textContent = pool.total != null
+        ? `新增${pool.added || 0} / 更新${pool.updated || 0} / 无效${pool.invalid || 0}`
+        : "-";
+      const warns = (result && result.warnings) || [];
+      document.getElementById("subWarn").textContent = warns.join("；") || (result && result.error) || "";
+    }
+
+    async function importSubscription() {
+      const url = document.getElementById("subUrl").value.trim();
+      const content = document.getElementById("subContent").value;
+      const name = document.getElementById("subName").value.trim();
+      const save = document.getElementById("subSave").value === "true";
+      if (!url && !content.trim()) {
+        setStatus(els.subStatus, "请填写订阅链接或粘贴内容", "err");
+        return;
+      }
+      setStatus(els.subStatus, "导入中...");
+      const payload = { name, save, write_pool: true };
+      if (url) payload.url = url;
+      if (content.trim()) payload.content = content;
+      const data = await api("/admin/subscriptions/import/", {
+        method: "POST",
+        headers: headers(true),
+        body: JSON.stringify(payload),
+      });
+      fillSubResult(data.result || {});
+      const st = ((data.result || {}).stats || {});
+      const total = st.total_nodes ?? ((data.result || {}).nodes || []).length;
+      const pool = ((data.result || {}).pool || {});
+      setStatus(els.subStatus, `导入完成：节点 ${total}（HTTP ${st.http_nodes ?? 0} / 协议 ${st.protocol_nodes ?? 0}），已写入代理池 ${pool.total ?? 0}`, "ok");
+      await loadSubscriptions();
+    }
+
+    document.getElementById("btnImportSub").addEventListener("click", () => importSubscription().catch(showErr));
+    document.getElementById("btnReloadSubs").addEventListener("click", () => loadSubscriptions().catch(showErr));
+    els.subTableBody.addEventListener("click", async (e) => {
+      const syncBtn = e.target.closest("[data-sub-sync]");
+      const delBtn = e.target.closest("[data-sub-del]");
+      const toggleBtn = e.target.closest("[data-sub-toggle]");
+      try {
+        if (syncBtn) {
+          const id = syncBtn.getAttribute("data-sub-sync");
+          setStatus(els.subStatus, "同步中...");
+          // 先取列表拿到 url
+          const data = await api("/admin/subscriptions/");
+          const item = (data.items || []).find((x) => x.id === id);
+          if (!item) throw new Error("subscription not found");
+          const resp = await api("/admin/subscriptions/import/", {
+            method: "POST",
+            headers: headers(true),
+            body: JSON.stringify({ id: item.id, url: item.url, name: item.name, save: true, write_pool: true }),
+          });
+          fillSubResult(resp.result || {});
+          setStatus(els.subStatus, "同步完成", "ok");
+          await loadSubscriptions();
+        }
+        if (toggleBtn) {
+          const id = toggleBtn.getAttribute("data-sub-toggle");
+          const enabled = toggleBtn.getAttribute("data-enabled") === "1";
+          const data = await api("/admin/subscriptions/");
+          const item = (data.items || []).find((x) => x.id === id);
+          if (!item) throw new Error("subscription not found");
+          await api("/admin/subscriptions/", {
+            method: "POST",
+            headers: headers(true),
+            body: JSON.stringify({ id: item.id, name: item.name, url: item.url, enabled: !enabled }),
+          });
+          await loadSubscriptions();
+        }
+        if (delBtn) {
+          const id = delBtn.getAttribute("data-sub-del");
+          if (!confirm("确认删除该订阅？")) return;
+          await api("/admin/subscriptions/?id=" + encodeURIComponent(id), { method: "DELETE", headers: headers(false) });
+          setStatus(els.subStatus, "已删除订阅", "ok");
+          await loadSubscriptions();
+        }
+      } catch (err) {
+        showErr(err);
+      }
     });
 
-    document.getElementById("btnReload").addEventListener("click", loadConfig);
-    document.getElementById("btnReset").addEventListener("click", loadConfig);
-    loadConfig().catch((err) => setStatus(String(err), "err"));
+
+
+    async function loadEndpoints() {
+      const box = document.getElementById("endpointStatus");
+      const body = document.getElementById("endpointTableBody");
+      if (!box || !body) return;
+      setStatus(box, "加载中...");
+      const data = await api("/admin/endpoints/");
+      const items = data.items || [];
+      if (!items.length) {
+        body.innerHTML = '<tr><td colspan="7" class="empty">还没有自定义接口</td></tr>';
+        setStatus(box, "暂无接口", "ok");
+        return;
+      }
+      body.innerHTML = items.map((it) => {
+        const r = it.rules || {};
+        const fullUrl = buildEndpointCallUrl(it.slug, (r && r.token) || "");
+        return `<tr>
+          <td>
+            <div>${escapeHtml(it.name || it.slug || "")}</div>
+            <div class="help mono">${escapeHtml(it.path || ("/open/" + it.slug))}</div>
+          </td>
+          <td class="mono" style="max-width:420px;word-break:break-all;">${escapeHtml(fullUrl)}</td>
+          <td>${escapeHtml(r.strategy || "-")}</td>
+          <td>${escapeHtml(r.pool || "-")}</td>
+          <td>${escapeHtml(r.lease_seconds ?? "-")}</td>
+          <td>${r.prefer_low_latency === false ? "否" : "是"}</td>
+          <td><div class="row-actions">
+            <button type="button" class="btn btn-secondary" data-ep-copy-full="${escapeAttr(fullUrl)}">复制完整地址</button>
+            <button type="button" class="btn btn-ghost" data-ep-copy="${escapeAttr(it.path || ("/open/" + it.slug))}">复制路径</button>
+            <button type="button" class="btn btn-danger" data-ep-del="${escapeAttr(it.slug || "")}">删除</button>
+          </div></td>
+        </tr>`;
+      }).join("");
+      setStatus(box, `已配置 ${items.length} 个对外接口`, "ok");
+    }
+
+    async function saveEndpoint() {
+      const box = document.getElementById("endpointStatus");
+      const slug = document.getElementById("endpointSlug").value.trim();
+      const name = document.getElementById("endpointName").value.trim() || slug;
+      if (!slug) { setStatus(box, "请填写 slug", "err"); return; }
+      const token = document.getElementById("endpointToken").value || "";
+      const payload = {
+        slug, name, enabled: true,
+        rules: {
+          strategy: document.getElementById("endpointStrategy").value,
+          pool: document.getElementById("endpointPool").value,
+          lease_seconds: Number(document.getElementById("endpointLease").value || 300),
+          default_node_type: document.getElementById("endpointNodeType").value.trim(),
+          fixed_proxy: document.getElementById("endpointFixedProxy").value.trim(),
+          token: token,
+          prefer_low_latency: document.getElementById("endpointPreferLowLatency").value === "true",
+          skip_timeout: document.getElementById("endpointSkipTimeout").value === "true",
+          max_latency_ms: Number(document.getElementById("endpointMaxLatency").value || 0),
+        }
+      };
+      setStatus(box, "保存中...");
+      const data = await api("/admin/endpoints/", { method: "POST", headers: headers(true), body: JSON.stringify(payload) });
+      const item = (data && data.item) || { slug, path: "/open/" + slug, rules: payload.rules };
+      const savedToken = ((item.rules || {}).token) || token || "";
+      const fullUrl = buildEndpointCallUrl(item.slug || slug, savedToken);
+      const curl = buildEndpointCurl(item.slug || slug, savedToken);
+      const fullEl = document.getElementById("endpointFullCallUrl");
+      const curlEl = document.getElementById("endpointFullCallCurl");
+      if (fullEl) fullEl.textContent = fullUrl;
+      if (curlEl) curlEl.textContent = curl;
+      setStatus(box, "已保存，完整调用地址已生成", "ok");
+      await loadEndpoints();
+      refreshEndpointAccessHints();
+    }
+
+
+    const btnSaveEndpoint = document.getElementById("btnSaveEndpoint");
+    const btnReloadEndpoints = document.getElementById("btnReloadEndpoints");
+    const endpointTableBody = document.getElementById("endpointTableBody");
+    if (btnSaveEndpoint) btnSaveEndpoint.addEventListener("click", () => saveEndpoint().catch(showErr));
+    if (btnReloadEndpoints) btnReloadEndpoints.addEventListener("click", () => loadEndpoints().catch(showErr));
+    if (endpointTableBody) endpointTableBody.addEventListener("click", async (e) => {
+      const copyBtn = e.target.closest("[data-ep-copy]");
+      const copyFullBtn = e.target.closest("[data-ep-copy-full]");
+      const delBtn = e.target.closest("[data-ep-del]");
+      if (copyFullBtn) {
+        await copyText(copyFullBtn.getAttribute("data-ep-copy-full") || "", "已复制完整调用地址");
+        return;
+      }
+      if (copyBtn) {
+        await copyText(copyBtn.getAttribute("data-ep-copy") || "", "已复制路径");
+        return;
+      }
+      if (delBtn) {
+        const slug = delBtn.getAttribute("data-ep-del");
+        if (!confirm("删除接口 /open/" + slug + " ?")) return;
+        await api("/admin/endpoints/?slug=" + encodeURIComponent(slug), { method: "DELETE", headers: headers(false) });
+        await loadEndpoints();
+        refreshEndpointAccessHints();
+      }
+});
+
+
+    
+    const ENDPOINT_PUBLIC_BASE_KEY = "proxy_pool_endpoint_public_base";
+    function getEndpointPublicBase() {
+      const input = document.getElementById("endpointPublicBase");
+      const typed = input ? input.value.trim().replace(/\/$/, "") : "";
+      if (typed) return typed;
+      return (window.location.origin || ("http://" + window.location.hostname + (window.location.port ? (":" + window.location.port) : ""))).replace(/\/$/, "");
+    }
+    function buildEndpointCallUrl(slug, token, clientId) {
+      const s = (slug || "crawler-a").trim() || "crawler-a";
+      const cid = (clientId || "job-1").trim() || "job-1";
+      const base = getEndpointPublicBase();
+      let url = base + "/open/" + encodeURIComponent(s) + "?client_id=" + encodeURIComponent(cid);
+      const tk = (token || "").trim();
+      if (tk) url += "&token=" + encodeURIComponent(tk);
+      return url;
+    }
+    function buildEndpointCurl(slug, token, clientId) {
+      const s = (slug || "crawler-a").trim() || "crawler-a";
+      const cid = (clientId || "job-1").trim() || "job-1";
+      const base = getEndpointPublicBase();
+      const url = base + "/open/" + encodeURIComponent(s) + "?client_id=" + encodeURIComponent(cid);
+      const tk = (token || "").trim();
+      if (tk) {
+        return 'curl -H "X-API-Token: ' + tk + '" "' + url + '"';
+      }
+      return 'curl "' + url + '"';
+    }
+    function refreshEndpointAccessHints() {
+      const slugInput = document.getElementById("endpointSlug");
+      const tokenInput = document.getElementById("endpointToken");
+      const slug = ((slugInput && slugInput.value.trim()) || "crawler-a");
+      const token = (tokenInput && tokenInput.value) || "";
+      const base = getEndpointPublicBase();
+      const full = buildEndpointCallUrl(slug, token, "job-1");
+      const curl = buildEndpointCurl(slug, token, "job-1");
+      const baseEl = document.getElementById("endpointBaseUrl");
+      const sampleEl = document.getElementById("endpointSampleUrl");
+      const fullEl = document.getElementById("endpointFullCallUrl");
+      const curlEl = document.getElementById("endpointFullCallCurl");
+      const localEl = document.getElementById("sampleLocal");
+      const remoteEl = document.getElementById("sampleRemote");
+      const tokenEl = document.getElementById("sampleToken");
+      if (baseEl) baseEl.textContent = base;
+      if (sampleEl) sampleEl.textContent = full;
+      if (fullEl) fullEl.textContent = full;
+      if (curlEl) curlEl.textContent = curl;
+      if (localEl) localEl.textContent = "GET " + full;
+      if (remoteEl) remoteEl.textContent = "GET " + full;
+      if (tokenEl) tokenEl.textContent = curl;
+    }
+    async function copyText(text, okMsg) {
+      const box = document.getElementById("endpointStatus");
+      try {
+        await navigator.clipboard.writeText(text);
+        if (box) setStatus(box, okMsg || "已复制", "ok");
+      } catch (_) {
+        // fallback
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); if (box) setStatus(box, okMsg || "已复制", "ok"); }
+        catch (e) { if (box) setStatus(box, "复制失败，请手动选择", "err"); }
+        document.body.removeChild(ta);
+      }
+    }
+    const endpointPublicBaseInput = document.getElementById("endpointPublicBase");
+    if (endpointPublicBaseInput) {
+      endpointPublicBaseInput.value = localStorage.getItem(ENDPOINT_PUBLIC_BASE_KEY) || "";
+      endpointPublicBaseInput.addEventListener("input", () => {
+        localStorage.setItem(ENDPOINT_PUBLIC_BASE_KEY, endpointPublicBaseInput.value.trim());
+        refreshEndpointAccessHints();
+      });
+    }
+    const endpointSlugInput = document.getElementById("endpointSlug");
+    if (endpointSlugInput) endpointSlugInput.addEventListener("input", refreshEndpointAccessHints);
+    const endpointTokenInput = document.getElementById("endpointToken");
+    if (endpointTokenInput) endpointTokenInput.addEventListener("input", refreshEndpointAccessHints);
+    const btnCopyFullCallUrl = document.getElementById("btnCopyFullCallUrl");
+    if (btnCopyFullCallUrl) btnCopyFullCallUrl.addEventListener("click", () => {
+      const el = document.getElementById("endpointFullCallUrl");
+      copyText((el && el.textContent) || "", "已复制完整调用地址");
+    });
+    const btnCopyFullCallCurl = document.getElementById("btnCopyFullCallCurl");
+    if (btnCopyFullCallCurl) btnCopyFullCallCurl.addEventListener("click", () => {
+      const el = document.getElementById("endpointFullCallCurl");
+      copyText((el && el.textContent) || "", "已复制 curl 命令");
+    });
+    refreshEndpointAccessHints();
+
+    els.adminToken.value = localStorage.getItem(TOKEN_KEY) || "";
+    renderApiList();
+    showView("overview");
+    loadOverview().catch(showErr);
   </script>
 </body>
 </html>

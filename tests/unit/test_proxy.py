@@ -68,7 +68,8 @@ class TestProxySerialization:
         d = p.to_dict
         expected_keys = {"proxy", "https", "fail_count", "region", "anonymous",
                          "source", "check_count", "last_status", "last_time"}
-        assert set(d.keys()) == expected_keys
+        assert expected_keys.issubset(set(d.keys()))
+        assert "proxy_url" in d and "proxies" in d
 
     def test_to_dict_values(self):
         p = Proxy("1.2.3.4:8080", source="test", https=True)
@@ -177,3 +178,28 @@ class TestProxyAddSource:
         p = Proxy("1.2.3.4:8080", source="src1")
         p.add_source(None)
         assert p.source == "src1"
+
+class TestProxyUrlExport:
+    def test_proxy_url_http(self):
+        p = Proxy("127.0.0.1:7890")
+        assert p.proxy == "127.0.0.1:7890"
+        assert p.proxy_url == "http://127.0.0.1:7890"
+        assert p.proxies["http"] == "http://127.0.0.1:7890"
+        d = p.to_dict
+        assert d["proxy"] == "127.0.0.1:7890"
+        assert d["proxy_url"] == "http://127.0.0.1:7890"
+        assert d["http"] == "http://127.0.0.1:7890"
+        assert d["proxies"]["https"] == "http://127.0.0.1:7890"
+
+    def test_proxy_url_socks(self):
+        p = Proxy("127.0.0.1:1080", protocol="socks5")
+        assert p.proxy_url == "socks5://127.0.0.1:1080"
+
+
+def test_latency_field_roundtrip():
+    p = Proxy("1.2.3.4:8080", latency_ms=123)
+    assert p.latency_ms == 123
+    d = p.to_dict
+    assert d["latency_ms"] == 123
+    p2 = Proxy.createFromJson(p.to_json)
+    assert p2.latency_ms == 123

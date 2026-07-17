@@ -27,6 +27,7 @@ HEADER = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/2010
           'Accept-Language': 'zh-CN,zh;q=0.8'}
 
 IP_REGEX = re.compile(r"(.*:.*@)?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}")
+HOSTPORT_REGEX = re.compile(r"(?:(?:[^:@\s]+):(?:[^:@\s]*)@)?(?:\[[0-9a-fA-F:]+\]|[A-Za-z0-9.-]+):\d{1,5}")
 
 
 class ProxyValidator(withMetaclass(Singleton)):
@@ -53,7 +54,9 @@ class ProxyValidator(withMetaclass(Singleton)):
 @ProxyValidator.addPreValidator
 def formatValidator(proxy):
     """检查代理格式"""
-    return True if IP_REGEX.fullmatch(proxy) else False
+    if isinstance(proxy, str) and proxy.startswith("node:"):
+        return True
+    return True if (IP_REGEX.fullmatch(proxy) or HOSTPORT_REGEX.fullmatch(proxy)) else False
 
 
 @ProxyValidator.addHttpValidator

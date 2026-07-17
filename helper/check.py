@@ -18,6 +18,14 @@ __author__ = 'JHao'
 from util.six import Empty
 from threading import Thread
 from datetime import datetime
+import time
+import socket
+import re
+
+
+def re_ip(host):
+    return bool(re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", str(host or "")))
+
 from util.webRequest import WebRequest
 from handler.logHandler import LogHandler
 from helper.validator import ProxyValidator
@@ -40,13 +48,28 @@ class DoValidator(object):
         Returns:
             Proxy Object
         """
-        http_r = cls.httpValidator(proxy)
-        https_r = False if not http_r else cls.httpsValidator(proxy)
-
         proxy.check_count += 1
         proxy.last_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        proxy.last_status = True if http_r else False
-        if http_r:
+
+        # 协议节点：TCP 连接延迟探测（不走 HTTP 代理校验）
+        if getattr(proxy, "is_protocol_node", False) or str(getattr(proxy, "proxy", "")).startswith("node:"):
+            ok, latency = cls.tcpLatency(proxy)
+            proxy.latency_ms = latency
+            proxy.last_status = bool(ok)
+            if ok:
+                if proxy.fail_count > 0:
+                    proxy.fail_count -= 1
+                if work_type == "raw" or not getattr(proxy, "region", ""):
+                    proxy.region = cls.regionGetterHost(getattr(proxy, "server", "") or "") if cls.conf.proxyRegion else (proxy.region or "")
+            else:
+                proxy.fail_count += 1
+            return proxy
+
+        # HTTP/HTTPS 代理：探测可用性并记录延迟
+        ok, latency, https_r = cls.httpLatency(proxy)
+        proxy.latency_ms = latency
+        proxy.last_status = bool(ok)
+        if ok:
             if proxy.fail_count > 0:
                 proxy.fail_count -= 1
             proxy.https = True if https_r else False
@@ -78,7 +101,79 @@ class DoValidator(object):
         return True
 
     @classmethod
+    def tcpLatency(cls, proxy):
+        """协议节点 TCP 延迟，返回 (ok, latency_ms)；失败 latency=-1"""
+        host = getattr(proxy, "server", "") or ""
+        port = getattr(proxy, "port", "") or ""
+        if not host or port in (None, ""):
+            # node:id 但缺 server/port
+            return False, -1
+        try:
+            port_i = int(port)
+        except Exception:
+            return False, -1
+        timeout = max(1, int(getattr(cls.conf, "verifyTimeout", 10) or 10))
+        start = time.time()
+        try:
+            with socket.create_connection((host, port_i), timeout=timeout):
+                pass
+            latency = int((time.time() - start) * 1000)
+            return True, max(0, latency)
+        except Exception:
+            return False, -1
+
+    @classmethod
+    def httpLatency(cls, proxy):
+        """HTTP 代理延迟探测，返回 (ok, latency_ms, https_ok)"""
+        from requests import head
+        timeout = max(1, int(getattr(cls.conf, "verifyTimeout", 10) or 10))
+        proxy_str = getattr(proxy, "proxy", "")
+        proxies = {
+            "http": "http://{proxy}".format(proxy=proxy_str),
+            "https": "http://{proxy}".format(proxy=proxy_str),
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
+        }
+        start = time.time()
+        try:
+            r = head(cls.conf.httpUrl, headers=headers, proxies=proxies, timeout=timeout)
+            if r.status_code != 200:
+                return False, -1, False
+            latency = int((time.time() - start) * 1000)
+        except Exception:
+            return False, -1, False
+        # https optional
+        https_ok = False
+        try:
+            r2 = head(cls.conf.httpsUrl, headers=headers, proxies=proxies, timeout=timeout, verify=False)
+            https_ok = (r2.status_code == 200)
+        except Exception:
+            https_ok = False
+        return True, max(0, latency), https_ok
+
+    @classmethod
+    def regionGetterHost(cls, host):
+        """根据 host/ip 解析地区"""
+        host = (host or "").strip()
+        if not host:
+            return ""
+        # 域名先解析 IP
+        try:
+            ip = host
+            if not re_ip(host):
+                ip = socket.gethostbyname(host)
+            url = "https://api.ip.sb/geoip/%s" % ip
+            r = WebRequest().get(url=url, retry_time=1, timeout=2).json
+            return (r.get("country_code") or r.get("country") or "") if r else ""
+        except Exception:
+            return ""
+
+    @classmethod
     def regionGetter(cls, proxy):
+
         try:
             url = 'https://api.ip.sb/geoip/%s' % proxy.proxy.split(':')[0]
             r = WebRequest().get(url=url, retry_time=1, timeout=2).json

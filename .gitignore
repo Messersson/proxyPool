@@ -13,3 +13,10 @@ docs/specs/
 htmlcov/
 # runtime config saved from admin UI
 data/runtime_config.json
+
+# local tooling / redis binaries
+.tools/
+
+# runtime subscription/node data (may contain secrets)
+data/nodes.json
+data/subscriptions.json

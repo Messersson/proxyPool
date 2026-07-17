@@ -98,6 +98,9 @@ class DbClient(withMetaclass(Singleton)):
     def delete(self, key, **kwargs):
         return self.client.delete(key, **kwargs)
 
+    def getItem(self, key, **kwargs):
+        return self.client.getItem(key, **kwargs)
+
     def exists(self, key, **kwargs):
         return self.client.exists(key, **kwargs)
 

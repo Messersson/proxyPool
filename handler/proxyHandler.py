@@ -84,3 +84,13 @@ class ProxyHandler(object):
         """
         total_use_proxy = self.db.getCount()
         return {'count': total_use_proxy}
+
+    def getByKey(self, proxy_key):
+        """
+        get a proxy object by key (host:port or node:<id>)
+        """
+        if not proxy_key:
+            return None
+        raw = self.db.getItem(proxy_key)
+        return Proxy.createFromJson(raw) if raw else None
+

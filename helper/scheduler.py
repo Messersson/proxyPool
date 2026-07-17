@@ -14,8 +14,9 @@
 """
 __author__ = 'JHao'
 
+import sys
 from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.executors.pool import ProcessPoolExecutor
+from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 
 from util.six import Queue
 from helper.fetch import Fetcher
@@ -57,10 +58,17 @@ def runScheduler():
                       id="proxy_fetch", name="proxy采集")
     scheduler.add_job(__runProxyCheck, 'interval', minutes=conf.checkIntervalMinutes,
                       id="proxy_check", name="proxy检查")
-    executors = {
-        'default': {'type': 'threadpool', 'max_workers': 20},
-        'processpool': ProcessPoolExecutor(max_workers=5)
-    }
+    # Windows ??????? ProcessPoolExecutor ????? WinError 5?
+    # ?????????????????? ThreadPoolExecutor ??????
+    if sys.platform.startswith("win"):
+        executors = {
+            'default': ThreadPoolExecutor(max_workers=20),
+        }
+    else:
+        executors = {
+            'default': {'type': 'threadpool', 'max_workers': 20},
+            'processpool': ProcessPoolExecutor(max_workers=5)
+        }
     job_defaults = {
         'coalesce': True,
         'max_instances': conf.schedulerMaxInstances,

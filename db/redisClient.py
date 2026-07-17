@@ -132,6 +132,16 @@ class RedisClient(object):
         self.__conn.srem(self._https_index, proxy_str)
         return result
 
+    def getItem(self, proxy_str):
+        """
+        ? key ?????? JSON
+        :param proxy_str: proxy str
+        :return: json str or None
+        """
+        if not proxy_str:
+            return None
+        return self.__conn.hget(self.name, proxy_str)
+
     def exists(self, proxy_str):
         """
         判断指定代理是否存在, 使用changeTable指定hash name

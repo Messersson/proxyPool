@@ -37,10 +37,11 @@ def admin_client(temp_config, app):
 class TestAdminConfigPage:
 
     def test_page_returns_html(self, admin_client):
-        resp = admin_client.get("/admin/config")
-        assert resp.status_code == 200
-        assert b"ProxyPool" in resp.data
-        assert b"configForm" in resp.data
+        for path in ("/", "/admin/", "/admin/config/"):
+            resp = admin_client.get(path)
+            assert resp.status_code == 200
+            assert b"ProxyPool" in resp.data
+            assert b"configForm" in resp.data
 
 
 class TestAdminConfigApi:
