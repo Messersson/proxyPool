@@ -197,6 +197,91 @@ curl -X POST "http://127.0.0.1:5010/v1/proxy/rules" -H "Content-Type: applicatio
 ```
 
 
+## ??????????????????
+
+`/compatible`??? `/v1/compatible`?????????????????????????????????????
+
+### ?????????
+
+```json
+{
+  "code": 0,
+  "ok": true,
+  "proxy": "1.2.3.4:8080",
+  "hostport": "1.2.3.4:8080",
+  "address": "1.2.3.4:8080",
+  "host": "1.2.3.4",
+  "ip": "1.2.3.4",
+  "port": 8080,
+  "proxy_url": "http://1.2.3.4:8080",
+  "http": "http://1.2.3.4:8080",
+  "http_proxy": "http://1.2.3.4:8080",
+  "https_proxy": "http://1.2.3.4:8080",
+  "HTTP_PROXY": "http://1.2.3.4:8080",
+  "HTTPS_PROXY": "http://1.2.3.4:8080",
+  "ALL_PROXY": "http://1.2.3.4:8080",
+  "proxies": {"http": "http://1.2.3.4:8080", "https": "http://1.2.3.4:8080"},
+  "requests": {"http": "http://1.2.3.4:8080", "https": "http://1.2.3.4:8080"},
+  "httpx": "http://1.2.3.4:8080",
+  "aiohttp": "http://1.2.3.4:8080",
+  "playwright": {"server": "http://1.2.3.4:8080"},
+  "curl_flag": "-x http://1.2.3.4:8080",
+  "export": "export HTTP_PROXY='http://1.2.3.4:8080' HTTPS_PROXY='http://1.2.3.4:8080' ALL_PROXY='http://1.2.3.4:8080'",
+  "formats": {
+    "text": "1.2.3.4:8080",
+    "url": "http://1.2.3.4:8080",
+    "env": "export HTTP_PROXY='http://1.2.3.4:8080' HTTPS_PROXY='http://1.2.3.4:8080' ALL_PROXY='http://1.2.3.4:8080'"
+  },
+  "item": {"proxy": "1.2.3.4:8080"}
+}
+```
+
+### ????
+
+```bash
+# ??????? JSON
+curl "http://127.0.0.1:5010/compatible?client_id=app1"
+
+# ?? host:port
+curl "http://127.0.0.1:5010/compatible?client_id=app1&format=text"
+
+# ?? URL
+curl "http://127.0.0.1:5010/compatible?client_id=app1&format=url"
+
+# shell ??????
+curl "http://127.0.0.1:5010/compatible?client_id=app1&format=env"
+
+# curl ??
+curl "http://127.0.0.1:5010/compatible?client_id=app1&format=curl"
+```
+
+Python / requests:
+
+```python
+import requests
+
+data = requests.get("http://127.0.0.1:5010/compatible", params={"client_id": "app1"}, timeout=5).json()
+proxies = data.get("proxies") or data.get("requests") or {
+    "http": data.get("proxy_url") or data.get("HTTP_PROXY"),
+    "https": data.get("proxy_url") or data.get("HTTPS_PROXY"),
+}
+print(requests.get("https://httpbin.org/ip", proxies=proxies, timeout=10).text)
+```
+
+Node.js:
+
+```js
+const data = await fetch("http://127.0.0.1:5010/compatible?client_id=app1").then(r => r.json());
+process.env.HTTP_PROXY = data.HTTP_PROXY;
+process.env.HTTPS_PROXY = data.HTTPS_PROXY;
+// ????? data.proxy_url / data.node_proxy
+```
+
+???
+- ????? `/v1/proxy` ???`strategy` / `pool` / `lease` / `rotate` / `type` / `client_id`
+- `/v1/proxy` ? `/open/<slug>` ??? `format=compatible|env|curl`
+- ?????? `/get` ???? `format=legacy`
+
 ## 自定义对外代理接口（每个接口独立规则）
 
 你可以创建多个对外接口，例如：
@@ -240,6 +325,67 @@ curl http://127.0.0.1:5010/admin/endpoints/
 curl -X DELETE "http://127.0.0.1:5010/admin/endpoints/?slug=crawler-a"
 ```
 
+
+
+
+## 对外接口返回格式（兼容性说明）
+
+默认 `/v1/proxy` 与 `/open/<slug>` 现在会把代理字段**扁平化到顶层**，同时保留 `item`，方便不同开发者接入：
+
+```json
+{
+  "code": 0,
+  "ok": true,
+  "proxy": "1.2.3.4:8080",
+  "proxy_url": "http://1.2.3.4:8080",
+  "proxies": {"http": "http://1.2.3.4:8080", "https": "http://1.2.3.4:8080"},
+  "item": {"proxy": "1.2.3.4:8080", "proxy_url": "http://1.2.3.4:8080", "...": "..."},
+  "client_key": "cid:app1",
+  "lease_remain_seconds": 280
+}
+```
+
+如果对方项目只认老式 `/get`，或只想拿纯文本，可用 `format` 参数（`/v1/proxy`、`/v1/proxy/current`、`/open/<slug>` 都支持）：
+
+| format | 返回 | 适合场景 |
+|--------|------|----------|
+| `json`（默认） | 扁平字段 + `item` | 通用，推荐 |
+| `legacy` | 与 `/get` 类似的对象 | 兼容旧爬虫/SDK |
+| `simple` | 精简 JSON | 移动端/轻量客户端 |
+| `text` | 纯文本 `host:port` | 脚本/命令行 |
+| `url` | 纯文本 `http://host:port` | 直接塞环境变量 |
+
+示例：
+
+```bash
+# 默认兼容 JSON（顶层直接有 proxy）
+curl "http://127.0.0.1:5010/v1/proxy?client_id=app1"
+
+# 兼容经典 /get 风格
+curl "http://127.0.0.1:5010/v1/proxy?client_id=app1&format=legacy"
+
+# 纯文本，方便 shell
+curl "http://127.0.0.1:5010/v1/proxy?client_id=app1&format=text"
+curl "http://127.0.0.1:5010/v1/proxy?client_id=app1&format=url"
+
+# 自定义接口也可固定格式
+curl -X POST http://127.0.0.1:5010/admin/endpoints/   -H "Content-Type: application/json"   -d '{"slug":"crawler-a","name":"爬虫A","rules":{"strategy":"round_robin","pool":"http","response_format":"legacy"}}'
+```
+
+Python 最稳妥写法：
+
+```python
+import requests
+
+def get_proxy(base="http://127.0.0.1:5010", client_id="app1"):
+    data = requests.get(f"{base}/v1/proxy", params={"client_id": client_id}, timeout=5).json()
+    # 兼容：顶层 proxy / item.proxy / 老字段
+    proxy = data.get("proxy") or (data.get("item") or {}).get("proxy")
+    proxies = data.get("proxies") or (data.get("item") or {}).get("proxies")
+    if not proxies and data.get("proxy_url"):
+        proxies = {"http": data["proxy_url"], "https": data["proxy_url"]}
+    return proxy, proxies
+```
 
 ## 代理返回格式（兼容旧字段）
 

@@ -391,6 +391,16 @@
               <div class="help">过滤最近测试失败的节点</div>
             </div>
             <div class="field"><label for="endpointMaxLatency">最大延迟ms(0不限)</label><input id="endpointMaxLatency" type="number" value="0" /><div class="help">例如 500 只取 &lt;=500ms</div></div>
+            <div class="field"><label for="endpointResponseFormat">返回格式</label>
+              <select id="endpointResponseFormat">
+                <option value="json" selected>兼容JSON(json)</option>
+                <option value="legacy">经典/get风格(legacy)</option>
+                <option value="simple">精简JSON(simple)</option>
+                <option value="text">纯文本host:port(text)</option>
+                <option value="url">纯文本URL(url)</option>
+              </select>
+              <div class="help">给其他开发者用时建议 json/legacy/text</div>
+            </div>
             <div class="field"><label for="endpointNodeType">节点类型(可选)</label><input id="endpointNodeType" type="text" placeholder="anytls / vmess / ss" /><div class="help">仅 node 池生效，留空不限</div></div>
             <div class="field full"><label for="endpointFixedProxy">指定HTTP代理(可选)</label><input id="endpointFixedProxy" type="text" placeholder="1.2.3.4:8080" /><div class="help">填了就固定返回它，不再自动选。普通场景请留空</div></div>
             <div class="field full"><label for="endpointToken">接口Token(可选)</label><input id="endpointToken" type="password" placeholder="不填则走全局 API_TOKEN" /><div class="help">调用时放请求头 X-API-Token，或 query token=</div></div>
@@ -404,7 +414,7 @@
           </div>
           <div class="table-wrap" style="margin-top:12px;">
             <table>
-              <thead><tr><th>名称</th><th>完整调用地址</th><th>策略</th><th>池</th><th>租约(秒)</th><th>低延迟优先</th><th>操作</th></tr></thead>
+              <thead><tr><th>名称</th><th>完整调用地址</th><th>策略</th><th>池</th><th>格式</th><th>租约(秒)</th><th>低延迟优先</th><th>操作</th></tr></thead>
               <tbody id="endpointTableBody"><tr><td colspan="6" class="empty">加载中...</td></tr></tbody>
             </table>
           </div>
@@ -763,6 +773,7 @@
         { path: "/node/count", desc: "协议节点数量统计" },
         { path: "/node/delete", desc: "删除协议节点" },
         { path: "/v1/proxy", desc: "统一获取代理（轮询/租约/指定）" },
+        { path: "/compatible", desc: "?????????????????" },
         { path: "/v1/proxy/rules", desc: "查看/设置调度规则" },
         { path: "/v1/proxy/status", desc: "调度状态与租约" },
         { path: "/admin/endpoints", desc: "自定义对外接口（独立规则）" },
@@ -1074,6 +1085,7 @@
           <td class="mono" style="max-width:420px;word-break:break-all;">${escapeHtml(fullUrl)}</td>
           <td>${escapeHtml(r.strategy || "-")}</td>
           <td>${escapeHtml(r.pool || "-")}</td>
+          <td>${escapeHtml(r.response_format || r.format || "json")}</td>
           <td>${escapeHtml(r.lease_seconds ?? "-")}</td>
           <td>${r.prefer_low_latency === false ? "否" : "是"}</td>
           <td><div class="row-actions">
@@ -1104,6 +1116,7 @@
           prefer_low_latency: document.getElementById("endpointPreferLowLatency").value === "true",
           skip_timeout: document.getElementById("endpointSkipTimeout").value === "true",
           max_latency_ms: Number(document.getElementById("endpointMaxLatency").value || 0),
+          response_format: document.getElementById("endpointResponseFormat").value || "json",
         }
       };
       setStatus(box, "保存中...");

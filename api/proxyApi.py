@@ -70,13 +70,14 @@ api_list = [
     {"url": "/node/all", "params": "type?,limit?", "desc": "list all nodes"},
     {"url": "/node/count", "params": "", "desc": "node pool stats"},
     {"url": "/node/delete", "params": "id or share", "desc": "delete a node"},
-    {"url": "/v1/proxy", "params": "strategy,pool,lease,type,id,proxy,client_id,rotate", "desc": "unified proxy acquire (round_robin/lease)"},
-    {"url": "/v1/proxy/current", "params": "client_id", "desc": "current leased proxy"},
+    {"url": "/v1/proxy", "params": "strategy,pool,lease,type,id,proxy,client_id,rotate,format", "desc": "unified proxy acquire; format=json|legacy|simple|text|url|compatible|env|curl"},
+    {"url": "/v1/proxy/current", "params": "client_id,format", "desc": "current leased proxy; format=json|legacy|simple|text|url|compatible|env|curl"},
     {"url": "/v1/proxy/release", "params": "client_id", "desc": "release leased proxy"},
     {"url": "/v1/proxy/rules", "params": "GET/POST", "desc": "get/set dispatch rules"},
     {"url": "/v1/proxy/status", "params": "", "desc": "dispatch status"},
     {"url": "/admin/endpoints", "params": "GET/POST/DELETE", "desc": "manage custom public proxy endpoints"},
-    {"url": "/open/<slug>", "params": "client_id,rotate,...", "desc": "custom endpoint with independent rules"},
+    {"url": "/open/<slug>", "params": "client_id,rotate,format,...", "desc": "custom endpoint; format=json|legacy|simple|text|url|compatible|env|curl"},
+    {"url": "/compatible", "params": "client_id,strategy,pool,lease,type,format,rotate", "desc": "max-compat external proxy API; multi-format address fields"},
     {"url": "/admin", "params": "", "desc": "unified admin panel"},
     {"url": "/admin/config/api", "params": "GET/POST", "desc": "read/save runtime config"},
 ]
@@ -88,6 +89,385 @@ def _extract_token():
         header_token = header_token[7:].strip()
     query_token = request.args.get("token", "")
     return header_token or query_token
+
+
+
+def _request_value(payload, key, default=""):
+    if key in request.args and request.args.get(key) not in (None, ""):
+        return request.args.get(key)
+    if isinstance(payload, dict) and key in payload and payload.get(key) not in (None, ""):
+        return payload.get(key)
+    return default
+
+
+def _normalize_format(raw):
+    fmt = str(raw or "json").strip().lower()
+    aliases = {
+        "default": "json",
+        "full": "json",
+        "flat": "json",
+        "legacy": "legacy",
+        "get": "legacy",
+        "classic": "legacy",
+        "old": "legacy",
+        "simple": "simple",
+        "basic": "simple",
+        "min": "simple",
+        "minimal": "simple",
+        "text": "text",
+        "plain": "text",
+        "raw": "text",
+        "hostport": "text",
+        "url": "url",
+        "proxy_url": "url",
+        "uri": "url",
+        "compatible": "compatible",
+        "compat": "compatible",
+        "all": "compatible",
+        "universal": "compatible",
+        "multi": "compatible",
+        "env": "env",
+        "export": "env",
+        "shell": "env",
+        "curl": "curl",
+        "curl_flag": "curl",
+        "x": "curl",
+    }
+    allowed = ("json", "legacy", "simple", "text", "url", "compatible", "env", "curl")
+    return aliases.get(fmt, fmt if fmt in allowed else "json")
+
+
+def _split_proxy_address(value):
+    """Parse host/port/user/pass from host:port or user:pass@host:port or URL."""
+    raw = str(value or "").strip()
+    if not raw:
+        return {"scheme": "", "host": "", "port": "", "username": "", "password": "", "hostport": "", "authority": ""}
+
+    scheme = ""
+    rest = raw
+    if "://" in raw:
+        scheme, rest = raw.split("://", 1)
+        scheme = scheme.lower().strip()
+
+    username = ""
+    password = ""
+    hostport = rest
+    if "@" in rest:
+        auth, hostport = rest.rsplit("@", 1)
+        if ":" in auth:
+            username, password = auth.split(":", 1)
+        else:
+            username = auth
+
+    host = hostport
+    port = ""
+    if hostport.startswith("["):
+        # IPv6 [addr]:port
+        end = hostport.find("]")
+        if end != -1:
+            host = hostport[1:end]
+            tail = hostport[end + 1:]
+            if tail.startswith(":"):
+                port = tail[1:]
+    elif hostport.count(":") == 1:
+        host, port = hostport.split(":", 1)
+    elif hostport.count(":") > 1 and not hostport.startswith("["):
+        # bare IPv6 without brackets; leave host as-is
+        host = hostport
+        port = ""
+
+    authority = hostport
+    if username or password:
+        authority = "%s:%s@%s" % (username, password, hostport)
+
+    return {
+        "scheme": scheme,
+        "host": host,
+        "port": str(port or ""),
+        "username": username,
+        "password": password,
+        "hostport": hostport,
+        "authority": authority if (username or password) else hostport,
+    }
+
+
+def _proxy_scheme_from_item(item):
+    item = item or {}
+    proto = str(item.get("protocol") or item.get("type") or "").lower()
+    proxy_url = str(item.get("proxy_url") or item.get("http") or item.get("https_proxy") or "")
+    if "://" in proxy_url:
+        return proxy_url.split("://", 1)[0].lower()
+    if proto in ("socks", "socks5", "socks5h"):
+        return "socks5"
+    if proto in ("socks4", "socks4a"):
+        return "socks4"
+    if proto == "https":
+        return "http"
+    return "http"
+
+
+def _build_compatible_fields(item):
+    """Build common proxy address aliases used by most languages/tools."""
+    item = item or {}
+    proxy = str(item.get("proxy") or item.get("http_proxy") or "").strip()
+    proxy_url = str(item.get("proxy_url") or item.get("http") or item.get("https_proxy") or "").strip()
+    if not proxy and proxy_url:
+        # strip scheme for host:port style
+        parts0 = _split_proxy_address(proxy_url)
+        proxy = parts0.get("authority") or parts0.get("hostport") or ""
+    if not proxy_url and proxy:
+        if "://" in proxy:
+            proxy_url = proxy
+        else:
+            scheme = _proxy_scheme_from_item(item)
+            proxy_url = "%s://%s" % (scheme, proxy)
+
+    parts = _split_proxy_address(proxy_url or proxy)
+    scheme = parts.get("scheme") or _proxy_scheme_from_item(item) or "http"
+    host = str(item.get("server") or parts.get("host") or "")
+    port = str(item.get("port") or parts.get("port") or "")
+    hostport = parts.get("hostport") or (("%s:%s" % (host, port)) if host and port else (proxy if "://" not in proxy else ""))
+    authority = parts.get("authority") or hostport
+    username = str(item.get("username") or parts.get("username") or "")
+    password = str(item.get("password") or parts.get("password") or "")
+
+    if not proxy:
+        proxy = hostport
+    if not proxy_url and hostport:
+        proxy_url = "%s://%s" % (scheme, authority if (username or password) else hostport)
+
+    # normalize scheme-specific urls
+    http_url = proxy_url
+    socks_url = proxy_url
+    if scheme.startswith("socks"):
+        http_url = "http://%s" % (authority if (username or password) else hostport) if hostport else proxy_url
+        socks_url = proxy_url if proxy_url.startswith("socks") else "socks5://%s" % (authority if (username or password) else hostport)
+    else:
+        if hostport:
+            http_url = "http://%s" % (authority if (username or password) else hostport)
+            socks_url = "socks5://%s" % (authority if (username or password) else hostport)
+        if not proxy_url:
+            proxy_url = http_url
+
+    proxies = item.get("proxies") if isinstance(item.get("proxies"), dict) else {}
+    if not proxies and proxy_url:
+        proxies = {"http": proxy_url, "https": proxy_url}
+
+    # requests/httpx often want both keys; urllib may use http/https
+    env = {
+        "HTTP_PROXY": http_url or proxy_url,
+        "HTTPS_PROXY": http_url or proxy_url,
+        "ALL_PROXY": proxy_url or http_url,
+        "http_proxy": http_url or proxy_url,
+        "https_proxy": http_url or proxy_url,
+        "all_proxy": proxy_url or http_url,
+    }
+    export_line = "export HTTP_PROXY='{0}' HTTPS_PROXY='{0}' ALL_PROXY='{1}'".format(
+        env["HTTP_PROXY"], env["ALL_PROXY"]
+    )
+    set_line = "set HTTP_PROXY={0}&& set HTTPS_PROXY={0}&& set ALL_PROXY={1}".format(
+        env["HTTP_PROXY"], env["ALL_PROXY"]
+    )
+    ps_line = "$env:HTTP_PROXY='{0}'; $env:HTTPS_PROXY='{0}'; $env:ALL_PROXY='{1}'".format(
+        env["HTTP_PROXY"], env["ALL_PROXY"]
+    )
+
+    try:
+        port_num = int(port) if str(port).isdigit() else port
+    except Exception:
+        port_num = port
+
+    fields = {
+        # classic /get
+        "proxy": proxy or hostport,
+        "proxy_url": proxy_url,
+        "http": http_url or proxy_url,
+        "https_proxy": http_url or proxy_url,
+        "http_proxy": http_url or proxy_url,
+        "proxies": proxies,
+        # split form
+        "host": host,
+        "ip": host,
+        "server": host,
+        "port": port_num,
+        "scheme": scheme or "http",
+        "username": username,
+        "password": password,
+        "hostport": hostport,
+        "address": hostport or proxy,
+        "authority": authority,
+        # env / tool aliases
+        "HTTP_PROXY": env["HTTP_PROXY"],
+        "HTTPS_PROXY": env["HTTPS_PROXY"],
+        "ALL_PROXY": env["ALL_PROXY"],
+        "env": env,
+        "export": export_line,
+        "export_bash": export_line,
+        "export_cmd": set_line,
+        "export_powershell": ps_line,
+        "curl": proxy_url,
+        "curl_proxy": proxy_url,
+        "curl_flag": "-x %s" % proxy_url if proxy_url else "",
+        "socks5": socks_url,
+        "socks5_url": socks_url,
+        # library oriented
+        "requests": dict(proxies) if proxies else {},
+        "httpx": proxy_url,
+        "aiohttp": proxy_url,
+        "urllib": proxies,
+        "playwright": {"server": proxy_url} if proxy_url else {},
+        "selenium": proxy_url,
+        "node_proxy": proxy_url,
+        "java_proxy": hostport or proxy,
+        "formats": {
+            "text": hostport or proxy,
+            "url": proxy_url,
+            "http": http_url or proxy_url,
+            "socks5": socks_url,
+            "curl": "-x %s" % proxy_url if proxy_url else "",
+            "env": export_line,
+            "host": host,
+            "port": port_num,
+            "hostport": hostport or proxy,
+            "userpass_hostport": authority if (username or password) else (hostport or proxy),
+        },
+    }
+    return fields
+
+
+def _resolve_response_format(payload=None, rules=None):
+    payload = payload or {}
+    rules = rules or {}
+    raw = _request_value(payload, "format", None)
+    if raw in (None, ""):
+        raw = _request_value(payload, "fmt", None)
+    if raw in (None, ""):
+        raw = rules.get("response_format") or rules.get("format")
+    if raw in (None, ""):
+        accept = (request.headers.get("Accept") or "").lower()
+        if "text/plain" in accept:
+            raw = "text"
+    return _normalize_format(raw)
+
+
+def _format_proxy_result(result, fmt="json", include_meta=True):
+    """Make dispatcher results easy for third-party clients.
+
+    Formats:
+      - json        : flattened fields + nested item (default)
+      - compatible  : max-compat aliases for most languages/tools
+      - legacy      : classic /get style object
+      - simple      : minimal ok/proxy/proxy_url/proxies
+      - text        : plain host:port
+      - url         : plain http(s)/socks URL
+      - env         : shell export text
+      - curl        : curl -x proxy text
+    """
+    fmt = _normalize_format(fmt)
+    if not isinstance(result, dict):
+        return result
+
+    item = result.get("item") if isinstance(result.get("item"), dict) else None
+    code = result.get("code", 0)
+    has_proxy = bool(item and (item.get("proxy") or item.get("proxy_url")))
+    compat = _build_compatible_fields(item) if item else {}
+
+    if fmt in ("text", "url", "env", "curl"):
+        if code not in (0, None) or not has_proxy:
+            body = ""
+            return body, 404 if code == 404 else 200, {"Content-Type": "text/plain; charset=utf-8"}
+        if fmt == "url":
+            body = str(compat.get("proxy_url") or item.get("proxy_url") or "")
+        elif fmt == "env":
+            body = str(compat.get("export") or "")
+        elif fmt == "curl":
+            body = str(compat.get("curl_flag") or (("-x %s" % compat.get("proxy_url")) if compat.get("proxy_url") else ""))
+        else:
+            body = str(compat.get("hostport") or item.get("proxy") or item.get("proxy_url") or "")
+        return body, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+    if fmt == "legacy":
+        if has_proxy:
+            data = dict(item)
+            # keep classic fields and add a few safe aliases
+            for k in ("proxy_url", "http", "https_proxy", "proxies", "host", "port", "hostport"):
+                if k in compat and k not in data:
+                    data[k] = compat.get(k)
+            if include_meta:
+                if result.get("client_key"):
+                    data["client_key"] = result.get("client_key")
+                if result.get("lease_remain_seconds") is not None:
+                    data["lease_remain_seconds"] = result.get("lease_remain_seconds")
+            return data
+        return {"code": code if code not in (None,) else 0, "src": result.get("src") or "no proxy"}
+
+    if fmt == "simple":
+        data = {
+            "ok": bool(has_proxy and code in (0, None)),
+            "code": code if code not in (None,) else 0,
+            "src": result.get("src") or ("ok" if has_proxy else "no proxy"),
+            "proxy": (item or {}).get("proxy") if item else None,
+            "proxy_url": (item or {}).get("proxy_url") if item else None,
+            "proxies": (item or {}).get("proxies") if item else {},
+            "https": (item or {}).get("https") if item else None,
+            "type": ((item or {}).get("type") or (item or {}).get("protocol")) if item else None,
+            "latency_ms": (item or {}).get("latency_ms") if item else None,
+            "host": compat.get("host"),
+            "port": compat.get("port"),
+            "HTTP_PROXY": compat.get("HTTP_PROXY"),
+            "HTTPS_PROXY": compat.get("HTTPS_PROXY"),
+        }
+        if include_meta:
+            data["client_key"] = result.get("client_key")
+            data["lease_seconds"] = result.get("lease_seconds")
+            data["lease_remain_seconds"] = result.get("lease_remain_seconds")
+            data["expire_at"] = result.get("expire_at")
+            data["strategy"] = result.get("strategy")
+            data["pool"] = result.get("pool")
+            data["mode"] = result.get("mode")
+        return data
+
+    # default json + compatible: flatten common fields
+    data = dict(result)
+    if item:
+        for key in (
+            "proxy", "proxy_url", "http", "https_proxy", "proxies", "https",
+            "latency_ms", "last_status", "region", "source", "protocol", "type",
+            "name", "share", "server", "port", "node_id", "id",
+        ):
+            if key in item and key not in data:
+                data[key] = item.get(key)
+        # always attach compatibility aliases (do not overwrite boolean https)
+        for key, value in compat.items():
+            if key == "https":
+                continue
+            if key not in data or data.get(key) in (None, "", {}):
+                data[key] = value
+        if fmt == "compatible":
+            # ensure nested bag for SDKs that only read one object
+            data["compatible"] = compat
+            data["formats"] = compat.get("formats") or {}
+        data.setdefault("ok", True)
+    else:
+        data.setdefault("ok", False)
+        data.setdefault("proxy", None)
+        data.setdefault("proxy_url", None)
+        data.setdefault("proxies", {})
+        if fmt == "compatible":
+            data["compatible"] = {}
+            data["formats"] = {}
+    return data
+
+
+def _dispatch_response(result, payload=None, rules=None):
+    fmt = _resolve_response_format(payload=payload, rules=rules)
+    formatted = _format_proxy_result(result, fmt=fmt)
+    if isinstance(formatted, tuple):
+        return formatted
+    code = result.get("code", 0) if isinstance(result, dict) else 0
+    if code == 404:
+        return formatted, 404
+    return formatted
 
 
 def require_api_token(func):
@@ -633,10 +1013,7 @@ def v1_proxy_acquire():
         request_ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""),
         request_token=_extract_token() or "",
     )
-    code = result.get("code", 0)
-    if code == 404:
-        return result, 404
-    return result
+    return _dispatch_response(result, payload=payload)
 
 
 @app.route('/v1/proxy/current/', methods=['GET'])
@@ -644,12 +1021,13 @@ def v1_proxy_acquire():
 @require_api_token
 def v1_proxy_current():
     from helper.proxyDispatcher import current
-    return current(
+    result = current(
         client_id=request.args.get("client_id", ""),
         client_key=request.args.get("client_key", ""),
         request_ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""),
         request_token=_extract_token() or "",
     )
+    return _dispatch_response(result, payload=request.args)
 
 
 @app.route('/v1/proxy/release/', methods=['GET', 'POST'])
@@ -721,6 +1099,7 @@ def admin_endpoints():
                 "strategy", "pool", "lease_seconds", "prefer_https", "default_node_type",
                 "fixed_proxy", "fixed_node_id", "fixed_share", "token",
                 "skip_timeout", "max_latency_ms", "prefer_low_latency",
+                "response_format", "format",
             ):
                 if k in payload:
                     rules[k] = payload.get(k)
@@ -731,6 +1110,71 @@ def admin_endpoints():
         return {"code": 0, "src": "saved", "item": item}
     except ValueError as e:
         return {"code": 400, "src": str(e)}, 400
+
+
+@app.route('/compatible/', methods=['GET', 'POST'])
+@app.route('/compatible', methods=['GET', 'POST'])
+@app.route('/v1/compatible/', methods=['GET', 'POST'])
+@app.route('/v1/compatible', methods=['GET', 'POST'])
+@require_api_token
+def compatible_proxy():
+    """Max-compat external proxy API for third-party projects.
+
+    Returns common address fields in one response:
+      - host:port / proxy / address
+      - http://host:port / proxy_url / HTTP_PROXY / HTTPS_PROXY
+      - requests / httpx / aiohttp / playwright structures
+      - format=text|url|env|curl|legacy|simple|json|compatible
+
+    Dispatch params match /v1/proxy: strategy/pool/lease/client_id/rotate/type/...
+    """
+    from helper.proxyDispatcher import acquire
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    args = request.args
+
+    def _get(key, default=""):
+        if key in args and args.get(key) not in (None, ""):
+            return args.get(key)
+        return payload.get(key, default)
+
+    lease_raw = _get("lease", None)
+    lease_seconds = None
+    if lease_raw not in (None, ""):
+        try:
+            lease_seconds = int(lease_raw)
+        except Exception:
+            return {"code": 400, "src": "lease must be int seconds"}, 400
+
+    rotate = str(_get("rotate", "0")).lower() in ("1", "true", "yes", "on")
+    prefer = _get("prefer_https", None)
+    prefer_https = None if prefer in (None, "") else str(prefer).lower() in ("1", "true", "yes", "on")
+
+    response_payload = dict(payload)
+    # query format wins via _resolve_response_format; if absent, default compatible
+    if _get("format", None) in (None, "") and _get("fmt", None) in (None, ""):
+        response_payload["format"] = "compatible"
+
+    result = acquire(
+        pool=str(_get("pool", "") or ""),
+        strategy=str(_get("strategy", "") or ""),
+        lease_seconds=lease_seconds,
+        node_type=str(_get("type", "") or ""),
+        prefer_https=prefer_https,
+        proxy=str(_get("proxy", "") or ""),
+        node_id=str(_get("id", "") or ""),
+        share=str(_get("share", "") or ""),
+        client_id=str(_get("client_id", "") or ""),
+        force_rotate=rotate,
+        request_ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""),
+        request_token=_extract_token() or "",
+    )
+    return _dispatch_response(
+        result,
+        payload=response_payload,
+        rules={"response_format": response_payload.get("format") or "compatible"},
+    )
 
 
 @app.route('/open/<slug>', methods=['GET', 'POST'])
@@ -768,7 +1212,7 @@ def open_endpoint(slug):
 
     # 请求参数可临时覆盖端点规则（不改持久配置）
     override = dict(rules)
-    for k in ("strategy", "pool", "default_node_type", "fixed_proxy", "fixed_node_id", "fixed_share"):
+    for k in ("strategy", "pool", "default_node_type", "fixed_proxy", "fixed_node_id", "fixed_share", "response_format", "format"):
         v = _get(k, None)
         if v not in (None, ""):
             override[k] = v
@@ -799,8 +1243,6 @@ def open_endpoint(slug):
         rules_override=override,
         endpoint_slug=str(ep.get("slug") or slug),
     )
-    if result.get("code") == 404:
-        return result, 404
     result["endpoint"] = {
         "slug": ep.get("slug"),
         "name": ep.get("name"),
@@ -811,9 +1253,10 @@ def open_endpoint(slug):
             "lease_seconds": override.get("lease_seconds"),
             "prefer_https": override.get("prefer_https"),
             "default_node_type": override.get("default_node_type"),
+            "response_format": override.get("response_format") or override.get("format") or "json",
         },
     }
-    return result
+    return _dispatch_response(result, payload=payload, rules=override)
 
 
 @app.route('/admin/config/api', methods=['GET', 'POST'])

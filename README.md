@@ -128,8 +128,28 @@ docker-compose up -d
 | /all | GET | 获取所有代理 |可选参数: `?type=https`|
 | /count | GET | 查看代理数量 |None|
 | /delete | GET/POST | 删除代理  |GET: `?proxy=host:port`；POST JSON: `{"proxy":"..."}`|
+| /compatible | GET/POST | ?????????? | ???? host:port / proxy_url / HTTP_PROXY / proxies ?????? |
+| /v1/proxy | GET/POST | ???????? | ?? strategy/pool/lease/client_id/format |
 
 可选鉴权：设置环境变量或 `setting.API_TOKEN` 后，业务接口需请求头 `X-API-Token` / `Authorization: Bearer` 或 `?token=`。
+
+?????????? `/compatible`?
+
+```bash
+curl "http://127.0.0.1:5010/compatible?client_id=app1"
+# ???? host:port
+curl "http://127.0.0.1:5010/compatible?format=text"
+# ?? URL / ???? / curl ??
+curl "http://127.0.0.1:5010/compatible?format=url"
+curl "http://127.0.0.1:5010/compatible?format=env"
+curl "http://127.0.0.1:5010/compatible?format=curl"
+```
+
+```python
+import requests
+data = requests.get("http://127.0.0.1:5010/compatible", params={"client_id": "app1"}, timeout=5).json()
+proxies = data.get("proxies") or {"http": data["proxy_url"], "https": data["proxy_url"]}
+```
 
 
 * 爬虫使用

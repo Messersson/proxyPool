@@ -45,6 +45,7 @@ def default_endpoint_rules() -> Dict[str, Any]:
         "skip_timeout": True,
         "max_latency_ms": 0,
         "prefer_low_latency": True,
+        "response_format": "json",   # json | legacy | simple | text | url | compatible | env | curl
     }
 
 
@@ -72,6 +73,22 @@ def _normalize_rules(raw: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         rules["max_latency_ms"] = 0
     rules["prefer_low_latency"] = bool(rules.get("prefer_low_latency", True))
+    fmt = str(rules.get("response_format") or rules.get("format") or "json").strip().lower()
+    aliases = {
+        "default": "json", "full": "json", "flat": "json",
+        "legacy": "legacy", "get": "legacy", "classic": "legacy", "old": "legacy",
+        "simple": "simple", "basic": "simple", "min": "simple", "minimal": "simple",
+        "text": "text", "plain": "text", "raw": "text", "hostport": "text",
+        "url": "url", "proxy_url": "url", "uri": "url",
+        "compatible": "compatible", "compat": "compatible", "all": "compatible", "universal": "compatible", "multi": "compatible",
+        "env": "env", "export": "env", "shell": "env",
+        "curl": "curl", "curl_flag": "curl", "x": "curl",
+    }
+    fmt = aliases.get(fmt, fmt)
+    if fmt not in ("json", "legacy", "simple", "text", "url", "compatible", "env", "curl"):
+        raise ValueError("response_format must be json|legacy|simple|text|url|compatible|env|curl")
+    rules["response_format"] = fmt
+    rules.pop("format", None)
     return rules
 
 
@@ -83,7 +100,7 @@ def _normalize_endpoint(item: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("slug invalid, use [A-Za-z0-9_-], 1-64 chars")
     reserved = {
         "get", "pop", "all", "count", "delete", "health", "admin", "api",
-        "node", "v1", "open", "static", "favicon.ico"
+        "node", "v1", "open", "compatible", "static", "favicon.ico"
     }
     if slug.lower() in reserved:
         raise ValueError("slug reserved: %s" % slug)
